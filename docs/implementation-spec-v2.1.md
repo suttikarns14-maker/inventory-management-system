@@ -325,7 +325,7 @@ export class AppError extends Error {
 | **Materials** | GET | `/materials` | ทุก role | `search`, `categoryId`, `status` (ค่าเริ่มต้น `ACTIVE`), `lowStock=true`, `sortBy` (`code`\|`name`\|`currentQuantity`\|`updatedAt`), `sortOrder`, `page`, `limit` |
 | | GET | `/materials/:id` | ทุก role | |
 | | POST | `/materials` | ADMIN, STAFF | 201 · ไม่รับ `currentQuantity` |
-| | PUT | `/materials/:id` | ADMIN | ไม่รับ `currentQuantity` |
+| | PUT | `/materials/:id` | ADMIN | ไม่รับ `currentQuantity` · แก้ `code` ได้ถ้าไม่ซ้ำ (D6) โดยประวัติอ้างถึงวัสดุด้วย `id` จึงไม่กระทบ แต่จะแสดงรหัสใหม่ |
 | **Inventory** | POST | `/inventory/transactions` | IN: ADMIN, STAFF · OUT: ทุก role | 201 |
 | | GET | `/inventory/transactions/:id` | ทุก role | USER ดูได้เฉพาะของตัวเอง |
 | | POST | `/inventory/transactions/:id/reverse` | ADMIN | body: `{ note }` (บังคับ) · 201 |
@@ -812,12 +812,9 @@ SEED_ADMIN_PASSWORD=change-me
 | D7 | Back-end | Node.js + TypeScript + Express 5 + Prisma | ✅ ตัดสินใจแล้ว |
 | D3 | STAFF เห็น Dashboard ได้ไหม | ได้ | ✅ ตัดสินใจแล้ว |
 | D4 | ค่าคงที่ในการแนะนำการสั่งซื้อ | 90 / 14 / 30 วัน | ✅ ตัดสินใจแล้ว |
+| D5 | จำนวนเป็นจำนวนเต็มเสมอไหม | จำนวนเต็มเสมอ (`Int`) | ✅ ตัดสินใจแล้ว |
+| D6 | แก้ `code` วัสดุหลังสร้างแล้วได้ไหม | ได้ (ADMIN) ถ้าไม่ซ้ำ | ✅ ตัดสินใจแล้ว |
 
-รอการตัดสินใจ:
-
-| # | เรื่อง | ข้อเสนอ | ส่วนที่รอ |
-|---|---|---|---|
-| D5 | จำนวนเป็นจำนวนเต็มเสมอไหม (มีวัสดุที่นับเป็นเมตรหรือกิโลกรัมไหม) | จำนวนเต็ม | §3 |
-| D6 | แก้ `code` วัสดุหลังสร้างแล้วได้ไหม | ได้ (ADMIN) ถ้าไม่ซ้ำ | §4.3 |
+ยังไม่ได้ตัดสินใจ: S1 email ของ Admin คนแรกและหมวดหมู่ตั้งต้น (ต้องใช้ใน Part 2)
 
 *Document Version: 2.1.0 | 2026-09-28*
