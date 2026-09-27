@@ -22,9 +22,9 @@ import { errorMessage } from '../../shared/utils/api-error';
         </div>
 
         <mat-form-field>
-          <mat-label>อีเมล</mat-label>
-          <input matInput type="email" formControlName="email" autocomplete="username" />
-          <mat-error>กรุณากรอกอีเมล</mat-error>
+          <mat-label>ชื่อผู้ใช้</mat-label>
+          <input matInput formControlName="username" autocomplete="username" autocapitalize="off" />
+          <mat-error>กรุณากรอกชื่อผู้ใช้</mat-error>
         </mat-form-field>
 
         <mat-form-field>
@@ -59,8 +59,8 @@ import { errorMessage } from '../../shared/utils/api-error';
           <div class="demo">
             <p class="muted">บัญชีทดสอบ (รหัสผ่าน {{ mockPassword }})</p>
             <div class="demo-buttons">
-              @for (account of accounts; track account.email) {
-                <button mat-stroked-button type="button" (click)="fill(account.email)">
+              @for (account of accounts; track account.username) {
+                <button mat-stroked-button type="button" (click)="fill(account.username)">
                   {{ account.label }}
                 </button>
               }
@@ -128,12 +128,12 @@ export class LoginPage {
   protected readonly error = signal('');
   protected readonly showPassword = signal(false);
   protected readonly form = inject(FormBuilder).nonNullable.group({
-    email: ['', [Validators.required]],
+    username: ['', [Validators.required]],
     password: ['', [Validators.required]],
   });
 
-  protected fill(email: string): void {
-    this.form.setValue({ email, password: MOCK_PASSWORD });
+  protected fill(username: string): void {
+    this.form.setValue({ username, password: MOCK_PASSWORD });
   }
 
   protected submit(): void {
@@ -141,10 +141,10 @@ export class LoginPage {
       this.form.markAllAsTouched();
       return;
     }
-    const { email, password } = this.form.getRawValue();
+    const { username, password } = this.form.getRawValue();
     this.loading.set(true);
     this.error.set('');
-    this.auth.login(email.trim(), password).subscribe({
+    this.auth.login(username.trim(), password).subscribe({
       next: (user) => this.router.navigateByUrl(homeFor(user.role)),
       error: (err: unknown) => {
         this.error.set(errorMessage(err));

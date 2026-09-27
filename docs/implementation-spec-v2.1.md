@@ -24,6 +24,7 @@
 | สร้างรายการสำเร็จ | 200 OK | 201 Created | m6 |
 | Secrets | hardcode ใน compose | `.env` (§9) | C7 |
 | Frontend | React / Next.js / Vite + TanStack Query + Zustand | **Angular** + Signals + Reactive Forms + Angular Material (§8) | M1 |
+| Login | email + password | **username** (ข้อความธรรมดา ไม่ต้องเป็น email) + password (§2, §3) | D8 |
 | Token | localStorage หรือ cookie | **HttpOnly cookie** + origin เดียวผ่าน proxy (§7) | C6, M12 |
 
 ---
@@ -58,13 +59,16 @@
 ### Epic 0: การเข้าสู่ระบบและผู้ใช้งาน
 
 **🆕 US-0.1 เข้าสู่ระบบ / ออกจากระบบ** (ทุก role)
-- Login ด้วย email + password ถ้าผิดตอบ 401 `INVALID_CREDENTIALS` โดยไม่บอกว่าผิดที่ email หรือรหัสผ่าน
+- Login ด้วย **username** + password โดย username ไม่ต้องเป็น email (เช่น `Admin`) และตัวพิมพ์เล็กใหญ่ไม่มีผล ส่วนรหัสผ่านต้องตรงทุกตัว
+- ถ้าผิดตอบ 401 `INVALID_CREDENTIALS` โดยไม่บอกว่าผิดที่ username หรือรหัสผ่าน
 - บัญชีที่ถูกปิด (`isActive = false`) login ไม่ได้ ตอบ 403 `USER_INACTIVE`
 - จำกัดการ login ผิดไว้ที่ 5 ครั้ง / 15 นาที / IP
 - Token หมดอายุหรือไม่ถูกต้อง ให้กลับไปหน้า `/login` เข้าหน้าที่ไม่มีสิทธิ์ ให้ไปหน้า `/403`
 
 **🆕 US-0.2 จัดการบัญชีผู้ใช้** (ADMIN) ที่หน้า `/settings/users`
 - ดูรายชื่อ, เพิ่มผู้ใช้, แก้ชื่อหรือ role, ปิด/เปิดใช้งาน และตั้งรหัสผ่านใหม่
+- **username:** 3-50 ตัวอักษร ใช้ได้เฉพาะ `A-Z a-z 0-9 . _ -` ห้ามซ้ำกัน (ไม่สนตัวพิมพ์เล็กใหญ่) และ**เปลี่ยนภายหลังไม่ได้**
+- **รหัสผ่าน:** อย่างน้อย 8 ตัวอักษร
 - **ไม่มีการลบผู้ใช้** เพราะประวัติรับ-จ่ายต้องอ้างถึงผู้ทำรายการได้เสมอ
 - ADMIN ห้ามลด role หรือปิดบัญชีของตัวเอง เพื่อกันไม่ให้ระบบเหลือแต่คนที่ไม่มี ADMIN
 - Admin คนแรกสร้างจาก seed script
@@ -143,7 +147,7 @@ enum MaterialStatus {
 
 model User {
   id                String             @id @default(uuid())
-  email             String             @unique
+  username          String             @unique
   passwordHash      String             @map("password_hash")
   fullName          String             @map("full_name")
   role              Role               @default(USER)
@@ -234,7 +238,11 @@ ALTER TABLE materials
   ADD CONSTRAINT materials_min_stock_nonneg        CHECK (min_stock >= 0);
 ALTER TABLE stock_transaction_items
   ADD CONSTRAINT items_quantity_positive CHECK (quantity > 0);
+-- username ห้ามซ้ำแบบไม่สนตัวพิมพ์เล็กใหญ่ ("Admin" = "admin")
+CREATE UNIQUE INDEX users_username_lower_key ON users (lower(username));
 ```
+
+การค้นหา user ตอน login ใช้ `where: { username: { equals: input, mode: 'insensitive' } }` และเก็บ username ตามที่พิมพ์ไว้ตอนสร้าง
 
 **หมายเหตุ**
 - `@@unique([transactionId, materialId])` กันวัสดุซ้ำในรายการเดียวระดับ DB (C3)
@@ -298,12 +306,12 @@ export class AppError extends Error {
 | `VALIDATION_ERROR` | 400 | input ไม่ผ่าน Zod |
 | `INSUFFICIENT_STOCK` | 400 | เบิกเกินยอดคงเหลือ หรือยกเลิก IN แล้วทำให้ยอดติดลบ |
 | `MATERIAL_INACTIVE` | 400 | ทำรายการกับวัสดุที่ปิดใช้งาน |
-| `INVALID_CREDENTIALS` | 401 | email หรือรหัสผ่านผิด |
+| `INVALID_CREDENTIALS` | 401 | username หรือรหัสผ่านผิด |
 | `UNAUTHORIZED` | 401 | ไม่มี token, token ไม่ถูกต้อง หรือหมดอายุ |
 | `USER_INACTIVE` | 403 | บัญชีถูกปิด |
 | `FORBIDDEN` | 403 | role ไม่มีสิทธิ์ |
 | `NOT_FOUND` | 404 | ไม่พบข้อมูล |
-| `DUPLICATE_CODE` | 409 | `code` วัสดุ, ชื่อหมวดหมู่ หรือ email ซ้ำ |
+| `DUPLICATE_CODE` | 409 | `code` วัสดุ, ชื่อหมวดหมู่ หรือ username ซ้ำ |
 | `ALREADY_REVERSED` | 409 | ยกเลิกรายการซ้ำ หรือยกเลิกรายการกลับ |
 | `TOO_MANY_REQUESTS` | 429 | login ผิดเกินกำหนด |
 | `INTERNAL_ERROR` | 500 | error ที่ไม่ได้คาดไว้ ห้ามส่ง stack trace ออกไป |
@@ -801,8 +809,9 @@ JWT_SECRET=change-me-to-a-long-random-string
 JWT_EXPIRES_IN=8h
 PORT=3000
 NODE_ENV=development
-SEED_ADMIN_EMAIL=admin@example.com
+SEED_ADMIN_USERNAME=Admin
 SEED_ADMIN_PASSWORD=change-me
+SEED_ADMIN_NAME=ผู้ดูแลระบบ
 ```
 
 ---
@@ -819,6 +828,9 @@ SEED_ADMIN_PASSWORD=change-me
 | D5 | จำนวนเป็นจำนวนเต็มเสมอไหม | จำนวนเต็มเสมอ (`Int`) | ✅ ตัดสินใจแล้ว |
 | D6 | แก้ `code` วัสดุหลังสร้างแล้วได้ไหม | ได้ (ADMIN) ถ้าไม่ซ้ำ | ✅ ตัดสินใจแล้ว |
 
-ยังไม่ได้ตัดสินใจ: S1 email ของ Admin คนแรกและหมวดหมู่ตั้งต้น (ต้องใช้ใน Part 2)
+| D8 | Login ด้วยอะไร | username ข้อความธรรมดา (ไม่ใช้ email ในระบบเลย) | ✅ ตัดสินใจแล้ว |
+| S1 | Admin คนแรก | username `Admin` · รหัสผ่านกำหนดใน `backend/.env` (ไม่ขึ้น Git) ควรเปลี่ยนหลัง login ครั้งแรก | ✅ ตัดสินใจแล้ว |
+
+ยังไม่ได้ยืนยัน: หมวดหมู่ตั้งต้น (ข้อเสนอ: 5 หมวดเดียวกับข้อมูลจำลอง) ใช้ใน seed ของ Part 2
 
 *Document Version: 2.1.0 | 2026-09-28*

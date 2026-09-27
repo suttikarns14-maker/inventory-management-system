@@ -20,9 +20,9 @@ export class AuthService {
     }
   }
 
-  login(email: string, password: string) {
+  login(username: string, password: string) {
     return this.http
-      .post<ApiSuccess<User>>(`${API}/auth/login`, { email, password })
+      .post<ApiSuccess<User>>(`${API}/auth/login`, { username, password })
       .pipe(unwrap(), tap((user) => this.user.set(user)));
   }
 

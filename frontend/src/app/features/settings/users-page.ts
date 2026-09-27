@@ -37,7 +37,7 @@ import { UserService } from './user.service';
     <section class="card">
       <div class="filters">
         <mat-form-field>
-          <mat-label>ค้นหาชื่อหรืออีเมล</mat-label>
+          <mat-label>ค้นหาชื่อหรือชื่อผู้ใช้</mat-label>
           <mat-icon matPrefix>search</mat-icon>
           <input matInput [formControl]="search" />
         </mat-form-field>
@@ -48,7 +48,7 @@ import { UserService } from './user.service';
           <thead>
             <tr>
               <th>ชื่อ-นามสกุล</th>
-              <th>อีเมล</th>
+              <th>ชื่อผู้ใช้</th>
               <th>สิทธิ์</th>
               <th>สถานะ</th>
               <th></th>
@@ -63,7 +63,7 @@ import { UserService } from './user.service';
                     <span class="muted">(คุณ)</span>
                   }
                 </td>
-                <td>{{ u.email }}</td>
+                <td>{{ u.username }}</td>
                 <td>{{ roleLabels[u.role] }}</td>
                 <td>
                   <span [class]="u.isActive ? 'badge badge-ok' : 'badge badge-neutral'">
@@ -163,7 +163,7 @@ export class UsersPage {
   protected resetPassword(user: User): void {
     const data: ReasonDialogData = {
       title: 'ตั้งรหัสผ่านใหม่',
-      message: `ตั้งรหัสผ่านใหม่ให้ ${user.fullName} (${user.email})`,
+      message: `ตั้งรหัสผ่านใหม่ให้ ${user.fullName} (${user.username})`,
       label: 'รหัสผ่านใหม่',
       confirmText: 'บันทึกรหัสผ่าน',
       type: 'password',

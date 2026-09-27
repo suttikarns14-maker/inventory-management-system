@@ -10,7 +10,7 @@
 
 | # | เรื่อง | ข้อเสนอตอนนี้ | กระทบ | ต้องตอบก่อน |
 |---|---|---|---|---|
-| S1 | email ของ Admin คนแรก และหมวดหมู่ตั้งต้น | ใช้ค่าจาก `.env` และหมวดหมู่ตัวอย่าง | `prisma/seed.ts` | Part 2 |
+| S2 | หมวดหมู่ตั้งต้นใน seed | 5 หมวดเดียวกับข้อมูลจำลอง (สำนักงาน, ไฟฟ้า, ทำความสะอาด, คอมพิวเตอร์, ซ่อมบำรุง) | `prisma/seed.ts` | Part 2 |
 
 รายละเอียดอยู่ใน [implementation-spec-v2.1.md §10](implementation-spec-v2.1.md)
 
@@ -26,6 +26,8 @@
 | D4 | ค่าคงที่ในการแนะนำการสั่งซื้อ | ใช้ข้อมูลย้อนหลัง 90 วัน · เตือนเมื่อจะหมดใน 14 วัน · สั่งให้พอใช้ 30 วัน |
 | D5 | จำนวนวัสดุ | จำนวนเต็มเสมอ |
 | D6 | แก้รหัสวัสดุหลังสร้างแล้ว | ได้ (ADMIN) ถ้าไม่ซ้ำ เพื่อความยืดหยุ่น |
+| D8 | Login | ใช้ username ข้อความธรรมดา (เช่น `Admin`) ไม่ใช้ email · ตัวพิมพ์เล็กใหญ่ไม่มีผล |
+| S1 | Admin คนแรก | username `Admin` · รหัสผ่านใส่ใน `backend/.env` (ไม่ขึ้น Git) |
 | D7 | Back-end | Node.js 24 + TypeScript + Express 5 + Prisma + Zod · PostgreSQL 16 บน Docker |
 | — | สิทธิ์ของแต่ละ role | ADMIN ทำได้ทุกอย่าง · STAFF รับเข้า เบิกจ่าย และเพิ่มวัสดุ · USER เบิกได้อย่างเดียว |
 | — | Dashboard | ควรสั่งซื้อ / เบิกมากที่สุด / ไม่เคยเบิก (ไม่มีมูลค่าคลัง) |
@@ -55,11 +57,13 @@
 - [x] หน้าตั้งค่าผู้ใช้และหมวดหมู่ (ADMIN)
 - [x] Unit test ของ mock API 10 ข้อ + ทดสอบใน browser ครบ 3 role และหน้าจอมือถือ 43 ข้อ ผ่านทั้งหมด
 
+- [x] เปลี่ยน login จาก email เป็น username (D8) · test 12 ข้อ + browser 43 ข้อ ผ่าน
+
 **ยังไม่ได้ทำ (ตั้งใจ):** ปรับหน้าตา UI ละเอียด ทำทีหลังตามที่ตกลงไว้ · ตารางบนมือถือยังค่อนข้างแน่น
 
 ### Part 2: Back-end + ต่อระบบ ⬜
 - [ ] Docker Compose + `.env.example` + Prisma schema และ migration (รวม `CHECK` constraints)
-- [ ] Seed ข้อมูล · ต้องตอบ S1 ก่อน
+- [ ] Seed ข้อมูล: Admin คนแรกจาก `.env` + หมวดหมู่ตั้งต้น (S2)
 - [ ] Express app: error handling, auth (cookie), role middleware
 - [ ] API: auth, users, categories, materials, inventory (รวม reverse), dashboard
 - [ ] Test ฝั่ง BE: เบิกเกินยอด, เบิกพร้อมกัน, จำนวนติดลบ, วัสดุซ้ำ, สิทธิ์แต่ละ role, ยกเลิกซ้ำ

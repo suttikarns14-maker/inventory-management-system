@@ -6,7 +6,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { Role, ROLE_LABELS, User } from '../../shared/models/user';
+import { Role, ROLE_LABELS, User, USERNAME_PATTERN } from '../../shared/models/user';
 import { Notify } from '../../shared/services/notify';
 import { applyServerErrors } from '../../shared/utils/api-error';
 import { UserService } from './user.service';
@@ -28,9 +28,14 @@ import { UserService } from './user.service';
     <form [formGroup]="form" (ngSubmit)="save()">
       <mat-dialog-content class="fields">
         <mat-form-field>
-          <mat-label>อีเมล</mat-label>
-          <input matInput type="email" formControlName="email" />
-          <mat-error>{{ form.controls.email.getError('server') ?? 'กรุณากรอกอีเมลให้ถูกต้อง' }}</mat-error>
+          <mat-label>ชื่อผู้ใช้ (ใช้ login)</mat-label>
+          <input matInput formControlName="username" autocapitalize="off" />
+          @if (!user) {
+            <mat-hint>A-Z, 0-9 และ . _ - ความยาว 3-50 ตัวอักษร เปลี่ยนภายหลังไม่ได้</mat-hint>
+          }
+          <mat-error>
+            {{ form.controls.username.getError('server') ?? 'ใช้ได้เฉพาะ A-Z, 0-9 และ . _ - ความยาว 3-50 ตัวอักษร' }}
+          </mat-error>
         </mat-form-field>
         <mat-form-field>
           <mat-label>ชื่อ-นามสกุล</mat-label>
@@ -84,9 +89,9 @@ export class UserDialog {
   protected readonly roleLabels = ROLE_LABELS;
   protected readonly saving = signal(false);
   protected readonly form = inject(FormBuilder).nonNullable.group({
-    email: [
-      { value: this.user?.email ?? '', disabled: !!this.user },
-      [Validators.required, Validators.email],
+    username: [
+      { value: this.user?.username ?? '', disabled: !!this.user },
+      [Validators.required, Validators.pattern(USERNAME_PATTERN)],
     ],
     fullName: [this.user?.fullName ?? '', Validators.required],
     role: [this.user?.role ?? ('USER' as Role)],
@@ -103,7 +108,7 @@ export class UserDialog {
     const request = this.user
       ? this.users.update(this.user.id, { fullName: v.fullName.trim(), role: v.role, isActive: v.isActive })
       : this.users.create({
-          email: v.email.trim(),
+          username: v.username.trim(),
           fullName: v.fullName.trim(),
           role: v.role,
           password: v.password,

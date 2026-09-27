@@ -32,6 +32,24 @@ describe('MockApi', () => {
     expect(new Set(store.data.transactions.map((t) => t.referenceNo)).size).toBe(store.data.transactions.length);
   });
 
+  it('logs in by username (case-insensitive) and rejects wrong passwords', () => {
+    const { call, store } = setup(null);
+    expect(call('POST', '/auth/login', { username: 'ADMIN', password: 'password123' }).status).toBe(200);
+    expect(store.session).toBe('user-admin');
+    const wrong = call('POST', '/auth/login', { username: 'admin', password: 'Password123' });
+    expect(wrong.body.error.code).toBe('INVALID_CREDENTIALS');
+    expect(call('POST', '/auth/login', { username: 'former', password: 'password123' }).body.error.code).toBe('USER_INACTIVE');
+  });
+
+  it('validates new usernames and rejects duplicates in any letter case', () => {
+    const { call } = setup('admin');
+    const base = { fullName: 'ทดสอบ', role: 'USER', password: 'P@ssw0rd' };
+    expect(call('POST', '/users', { ...base, username: 'new.user_1' }).status).toBe(201);
+    expect(call('POST', '/users', { ...base, username: 'New.User_1' }).status).toBe(409);
+    const bad = call('POST', '/users', { ...base, username: 'มี เว้นวรรค' });
+    expect(bad.body.error.details[0].field).toBe('username');
+  });
+
   it('rejects unauthenticated requests', () => {
     const { call } = setup(null);
     expect(call('GET', '/materials').status).toBe(401);

@@ -43,7 +43,7 @@
       </button>
       <mat-menu #userMenu="matMenu" xPosition="before">
         <div class="menu-user">
-          <div>{{ user()?.email }}</div>
+          <div>{{ user()?.username }}</div>
           <div class="muted">{{ roleLabel() }}</div>
         </div>
         @if (useMock) {
