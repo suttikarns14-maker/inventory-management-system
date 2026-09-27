@@ -45,7 +45,7 @@ Layered architecture: `routes → middlewares → controllers → services → P
 
 ## Domain model
 
-`User` (role: ADMIN | STAFF | USER, `isActive`), `Category`, `Material` (code unique, `currentQuantity`, `minStock`, `location`, `status` enum ACTIVE/INACTIVE), `StockTransaction` (type IN/OUT, `referenceNo` unique เช่น `TXN-20260927-001`, `reversalOfId` ใช้ยกเลิกรายการ), `StockTransactionItem` (quantity, `unitPrice` Decimal(10,2) ใช้เฉพาะ IN), `ReferenceCounter` (ตัวนับเลขอ้างอิงรายวัน) ดู schema เต็มในสเปก §3
+`User` (`username` ใช้ login ไม่ใช่ email · ไม่สนตัวพิมพ์เล็กใหญ่ · role: ADMIN | STAFF | USER, `isActive`), `Category`, `Material` (code unique, `currentQuantity`, `minStock`, `location`, `status` enum ACTIVE/INACTIVE), `StockTransaction` (type IN/OUT, `referenceNo` unique เช่น `TXN-20260927-001`, `reversalOfId` ใช้ยกเลิกรายการ), `StockTransactionItem` (quantity, `unitPrice` Decimal(10,2) ใช้เฉพาะ IN), `ReferenceCounter` (ตัวนับเลขอ้างอิงรายวัน) ดู schema เต็มในสเปก §3
 
 ## Roles
 
@@ -86,7 +86,7 @@ DB ใช้ snake_case (`@map`) ส่วนโค้ดใช้ camelCase
 
 ## Pending decisions (ต้องถามผู้ใช้ก่อนเขียนส่วนที่เกี่ยวข้อง)
 
-ดูสเปก §10: เหลือแค่ S1 (Admin คนแรกและหมวดหมู่ตั้งต้น ใช้ใน Part 2) · จำนวนเป็นจำนวนเต็มเสมอ (D5) · ADMIN แก้ `code` วัสดุได้ถ้าไม่ซ้ำ (D6)
+ดูสเปก §10: เหลือแค่หมวดหมู่ตั้งต้นใน seed (S2) · Admin คนแรก username `Admin` รหัสผ่านอยู่ใน `backend/.env` เท่านั้น ห้ามใส่ในโค้ดหรือเอกสาร (S1) · จำนวนเป็นจำนวนเต็มเสมอ (D5) · ADMIN แก้ `code` วัสดุได้ถ้าไม่ซ้ำ (D6)
 
 **ลำดับงาน:** Part 1 = Angular FE ที่รันด้วย mock API (interceptor ตอบตามสเปก §4.3 ห้ามคิดรูปแบบ API ขึ้นเอง) ส่วน Part 2 = BE จริงแล้วปิด mock รายละเอียดอยู่ใน `docs/status.md`
 
@@ -101,7 +101,7 @@ Secrets อยู่ใน `.env` เท่านั้น ห้าม commit `
 ## Commands
 
 Frontend (รันใน `frontend/`):
-- `npm start`: dev server ที่ http://localhost:4200 (บัญชีทดสอบ `admin@` / `staff@` / `user@example.com` รหัสผ่าน `password123`)
+- `npm start`: dev server ที่ http://localhost:4200 (บัญชีทดสอบ username `admin` / `staff` / `user` รหัสผ่าน `password123`)
 - `npm run build`: production build
 - `npm test -- --watch=false`: Vitest (ตอนนี้มี test ของ mock API)
 - ไฟล์ component ใช้รูปแบบ Angular 20+ (`login-page.ts` คลาส `LoginPage` ไม่มี suffix `.component`)

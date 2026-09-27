@@ -6,9 +6,12 @@ export const ROLE_LABELS: Record<Role, string> = {
   USER: 'ผู้เบิก',
 };
 
+/** 3-50 chars: letters, digits, dot, underscore, hyphen. Unique, case-insensitive. */
+export const USERNAME_PATTERN = /^[A-Za-z0-9._-]{3,50}$/;
+
 export interface User {
   id: string;
-  email: string;
+  username: string;
   fullName: string;
   role: Role;
   isActive: boolean;
@@ -17,7 +20,7 @@ export interface User {
 }
 
 export interface CreateUserInput {
-  email: string;
+  username: string;
   fullName: string;
   role: Role;
   password: string;

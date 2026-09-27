@@ -1,5 +1,5 @@
 import { ErrorCode, FieldError, PageMeta } from '../../shared/models/api';
-import { Role, User } from '../../shared/models/user';
+import { Role, User, USERNAME_PATTERN } from '../../shared/models/user';
 import { Category, Material, MaterialStatus } from '../../shared/models/material';
 import { StockTransaction, TransactionType } from '../../shared/models/transaction';
 import {
@@ -182,12 +182,12 @@ export class MockApi {
 
   private login(c: Ctx): MockResponse {
     const v = new Validator(c.body);
-    const email = v.str('email', 'อีเมล');
+    const username = v.str('username', 'ชื่อผู้ใช้');
     const password = v.str('password', 'รหัสผ่าน');
     v.check();
-    const user = this.db.users.find((u) => u.email.toLowerCase() === email!.toLowerCase());
+    const user = this.findByUsername(username!);
     if (!user || user.password !== password) {
-      throw new MockError(401, 'INVALID_CREDENTIALS', 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+      throw new MockError(401, 'INVALID_CREDENTIALS', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
     }
     if (!user.isActive) throw new MockError(403, 'USER_INACTIVE', 'บัญชีนี้ถูกปิดการใช้งาน');
     this.store.session = user.id;
@@ -201,6 +201,11 @@ export class MockApi {
 
   // ---- users ----
 
+  /** Usernames are unique case-insensitively ("Admin" and "admin" are the same account). */
+  private findByUsername(username: string): UserRow | undefined {
+    return this.db.users.find((u) => u.username.toLowerCase() === username.toLowerCase());
+  }
+
   private toUser({ password: _, ...user }: UserRow): User {
     return user;
   }
@@ -212,7 +217,7 @@ export class MockApi {
     const role = q.get('role');
     const isActive = q.get('isActive');
     const users = this.db.users
-      .filter((u) => !search || u.email.toLowerCase().includes(search) || u.fullName.toLowerCase().includes(search))
+      .filter((u) => !search || u.username.toLowerCase().includes(search) || u.fullName.toLowerCase().includes(search))
       .filter((u) => !role || u.role === role)
       .filter((u) => isActive === null || String(u.isActive) === isActive)
       .sort((a, b) => a.fullName.localeCompare(b.fullName, 'th'))
@@ -223,19 +228,23 @@ export class MockApi {
   private createUser(c: Ctx): MockResponse {
     this.auth(c, 'ADMIN');
     const v = new Validator(c.body);
-    const email = v.str('email', 'อีเมล');
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) v.errors.push({ field: 'email', message: 'รูปแบบอีเมลไม่ถูกต้อง' });
+    const username = v.str('username', 'ชื่อผู้ใช้', { max: 50 });
+    if (username && !USERNAME_PATTERN.test(username)) {
+      v.errors.push({ field: 'username', message: 'ใช้ได้เฉพาะ A-Z, 0-9 และ . _ - ความยาว 3-50 ตัวอักษร' });
+    }
     const fullName = v.str('fullName', 'ชื่อ-นามสกุล');
     const role = v.oneOf('role', 'สิทธิ์', ['ADMIN', 'STAFF', 'USER'] as const);
     const password = this.password(v);
     v.check();
-    if (this.db.users.some((u) => u.email.toLowerCase() === email!.toLowerCase())) {
-      throw new MockError(409, 'DUPLICATE_CODE', 'อีเมลนี้ถูกใช้แล้ว', [{ field: 'email', message: 'อีเมลนี้ถูกใช้แล้ว' }]);
+    if (this.findByUsername(username!)) {
+      throw new MockError(409, 'DUPLICATE_CODE', 'ชื่อผู้ใช้นี้ถูกใช้แล้ว', [
+        { field: 'username', message: 'ชื่อผู้ใช้นี้ถูกใช้แล้ว' },
+      ]);
     }
     const now = new Date().toISOString();
     const user: UserRow = {
       id: crypto.randomUUID(),
-      email: email!,
+      username: username!,
       password,
       fullName: fullName!,
       role,

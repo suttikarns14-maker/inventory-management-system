@@ -12,9 +12,9 @@ import {
 export const MOCK_PASSWORD = 'password123';
 
 export const MOCK_ACCOUNTS = [
-  { email: 'admin@example.com', label: 'ADMIN' },
-  { email: 'staff@example.com', label: 'STAFF' },
-  { email: 'user@example.com', label: 'USER' },
+  { username: 'admin', label: 'ADMIN' },
+  { username: 'staff', label: 'STAFF' },
+  { username: 'user', label: 'USER' },
 ] as const;
 
 /** Deterministic PRNG so every reset produces the same story. */
@@ -91,14 +91,14 @@ export function createSeedData(now: Date = new Date()): MockData {
   const created = at(SIM_DAYS + 1).toISOString();
 
   const users: UserRow[] = [
-    ['admin@example.com', 'สมชาย ใจดี', 'ADMIN', true],
-    ['staff@example.com', 'สมหญิง รักงาน', 'STAFF', true],
-    ['user@example.com', 'วิชัย ขยันเบิก', 'USER', true],
-    ['user2@example.com', 'มานี มีสุข', 'USER', true],
-    ['former@example.com', 'ประเสริฐ ลาออกแล้ว', 'USER', false],
-  ].map(([email, fullName, role, isActive]) => ({
-    id: `user-${String(email).split('@')[0]}`,
-    email: email as string,
+    ['admin', 'สมชาย ใจดี', 'ADMIN', true],
+    ['staff', 'สมหญิง รักงาน', 'STAFF', true],
+    ['user', 'วิชัย ขยันเบิก', 'USER', true],
+    ['user2', 'มานี มีสุข', 'USER', true],
+    ['former', 'ประเสริฐ ลาออกแล้ว', 'USER', false],
+  ].map(([username, fullName, role, isActive]) => ({
+    id: `user-${username}`,
+    username: username as string,
     password: MOCK_PASSWORD,
     fullName: fullName as string,
     role: role as UserRow['role'],

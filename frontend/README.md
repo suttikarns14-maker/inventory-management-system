@@ -11,11 +11,11 @@ npm start       # http://localhost:4200
 
 ตอนนี้ (Part 1) ใช้ **mock API** ในตัวแอป จึงไม่ต้องมี back-end หรือ Docker ข้อมูลเก็บใน `localStorage` ของ browser
 
-| บัญชีทดสอบ | สิทธิ์ |
+| Username | สิทธิ์ |
 |---|---|
-| `admin@example.com` | ADMIN: ทำได้ทุกอย่าง |
-| `staff@example.com` | STAFF: รับเข้า เบิกจ่าย และเพิ่มวัสดุ |
-| `user@example.com` | USER: เบิกได้อย่างเดียว |
+| `admin` | ADMIN: ทำได้ทุกอย่าง |
+| `staff` | STAFF: รับเข้า เบิกจ่าย และเพิ่มวัสดุ |
+| `user` | USER: เบิกได้อย่างเดียว |
 
 รหัสผ่านทุกบัญชีคือ `password123` หน้า login มีปุ่มกรอกให้อัตโนมัติ
 

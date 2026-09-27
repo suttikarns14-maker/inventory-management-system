@@ -7,7 +7,7 @@ import { TransactionType } from '../../shared/models/transaction';
 
 export interface UserRow {
   id: string;
-  email: string;
+  username: string;
   password: string; // ponytail: plain text, mock only. The real BE stores a bcrypt hash.
   fullName: string;
   role: Role;
@@ -78,7 +78,8 @@ export class MemoryStore implements MockStore {
   save(): void {}
 }
 
-const DATA_KEY = 'ims-mock-data-v1';
+// Bump the version whenever the row shape changes so old browser data is replaced by a fresh seed.
+const DATA_KEY = 'ims-mock-data-v2'; // v2: email -> username
 const SESSION_KEY = 'ims-mock-session';
 
 export class LocalStorageStore implements MockStore {
