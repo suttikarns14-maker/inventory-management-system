@@ -1,0 +1,174 @@
+@use '@angular/material' as mat;
+
+html {
+  color-scheme: light;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$orange-palette,
+      ),
+      typography: Kanit,
+      density: 0,
+    )
+  );
+
+  // Semantic colours used by badges, KPI cards and table highlights.
+  --app-danger: #b3261e;
+  --app-danger-bg: #fce8e6;
+  --app-warn: #9a4d00;
+  --app-warn-bg: #fff0dc;
+  --app-ok: #1b6b36;
+  --app-ok-bg: #e3f4e8;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+}
+
+// ---- page layout ----
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+
+  h1 {
+    flex: 1;
+    margin: 0;
+    font: var(--mat-sys-headline-small);
+  }
+}
+
+.card {
+  background: var(--mat-sys-surface-container-lowest);
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+
+  > h2 {
+    margin: 0 0 16px;
+    font: var(--mat-sys-title-medium);
+  }
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+
+  mat-form-field {
+    flex: 1 1 200px;
+  }
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+
+  .span-all {
+    grid-column: 1 / -1;
+  }
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.full {
+  width: 100%;
+}
+
+.muted {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.table-wrap {
+  overflow-x: auto;
+
+  table {
+    width: 100%;
+  }
+}
+
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 32px;
+}
+
+// ---- status colours ----
+
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font: var(--mat-sys-label-medium);
+  white-space: nowrap;
+}
+
+.badge-ok {
+  background: var(--app-ok-bg);
+  color: var(--app-ok);
+}
+
+.badge-danger {
+  background: var(--app-danger-bg);
+  color: var(--app-danger);
+}
+
+.badge-warn {
+  background: var(--app-warn-bg);
+  color: var(--app-warn);
+}
+
+.badge-neutral {
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.row-danger {
+  background: var(--app-danger-bg);
+}
+
+.row-warn {
+  background: var(--app-warn-bg);
+}
+
+.text-danger {
+  color: var(--app-danger);
+}
+
+.snack-error {
+  --mat-snack-bar-container-color: var(--app-danger);
+  --mat-snack-bar-supporting-text-color: #fff;
+  --mat-snack-bar-button-color: #fff;
+}

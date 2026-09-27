@@ -8,7 +8,9 @@
 
 ความคืบหน้าและเรื่องที่รอยืนยันอยู่ที่ [docs/status.md](docs/status.md) ทำงานข้อไหนเสร็จแล้วให้อัปเดตไฟล์นั้นด้วย
 
-ยังไม่มีโค้ด `backend/` มีแค่โครงโฟลเดอร์ (`.gitkeep`) ส่วน `frontend/` จะสร้างด้วย Angular CLI ใน Part 1 ตามโครงในสเปก §8.1 เมื่อมี `package.json` แล้วให้อัปเดตส่วน **Commands**
+`frontend/` (Angular 22, zoneless) ทำครบทุกหน้าแล้ว และรันด้วย mock API (`USE_MOCK_API` ใน `src/app/core/mock/mock-backend.ts`) ส่วน `backend/` ยังมีแค่โครงโฟลเดอร์ (Part 2)
+
+**API contract:** รูปแบบ response ของแต่ละ entity อยู่ใน `frontend/src/app/shared/models/` back-end ต้องตอบให้ตรงกัน ถ้าต้องเปลี่ยน ให้แก้ model, mock และสเปกพร้อมกัน
 
 ## Architecture
 
@@ -98,4 +100,10 @@ Secrets อยู่ใน `.env` เท่านั้น ห้าม commit `
 
 ## Commands
 
-_ยังไม่มี: เพิ่มเมื่อ scaffold `frontend/` และ `backend/` แล้ว (dev, build, test, lint, prisma migrate/seed, docker compose up)_
+Frontend (รันใน `frontend/`):
+- `npm start`: dev server ที่ http://localhost:4200 (บัญชีทดสอบ `admin@` / `staff@` / `user@example.com` รหัสผ่าน `password123`)
+- `npm run build`: production build
+- `npm test -- --watch=false`: Vitest (ตอนนี้มี test ของ mock API)
+- ไฟล์ component ใช้รูปแบบ Angular 20+ (`login-page.ts` คลาส `LoginPage` ไม่มี suffix `.component`)
+
+Backend: _ยังไม่มี (Part 2)_

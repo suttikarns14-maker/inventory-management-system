@@ -14,4 +14,14 @@
 
 ## วิธีรัน
 
-ยังไม่มี จะเพิ่มเมื่อสร้างโปรเจกต์ front-end (Part 1) และ back-end (Part 2) แล้ว
+**Front-end** (ตอนนี้ใช้ข้อมูลจำลอง ไม่ต้องมี back-end):
+
+```bash
+cd frontend
+npm install
+npm start       # เปิด http://localhost:4200
+```
+
+รายละเอียดและบัญชีทดสอบอยู่ใน [frontend/README.md](frontend/README.md)
+
+**Back-end:** ยังไม่มี จะทำใน Part 2

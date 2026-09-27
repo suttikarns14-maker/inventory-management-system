@@ -1,0 +1,137 @@
+<div class="page-header">
+  <h1>{{ isUser ? 'ประวัติการเบิกของฉัน' : 'ประวัติรับ-จ่าย' }}</h1>
+</div>
+
+<section class="card">
+  <div class="filters">
+    <mat-form-field>
+      <mat-label>ตั้งแต่วันที่</mat-label>
+      <input
+        matInput
+        type="date"
+        [ngModel]="query().from ?? ''"
+        (ngModelChange)="setFilter({ from: $event || undefined })"
+      />
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>ถึงวันที่</mat-label>
+      <input
+        matInput
+        type="date"
+        [ngModel]="query().to ?? ''"
+        (ngModelChange)="setFilter({ to: $event || undefined })"
+      />
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>ประเภท</mat-label>
+      <mat-select
+        [value]="query().type ?? ''"
+        (selectionChange)="setFilter({ type: $event.value || undefined })"
+      >
+        <mat-option value="">ทั้งหมด</mat-option>
+        <mat-option value="IN">รับเข้า</mat-option>
+        <mat-option value="OUT">เบิกจ่าย</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>วัสดุ</mat-label>
+      <mat-select
+        [value]="query().materialId ?? ''"
+        (selectionChange)="setFilter({ materialId: $event.value || undefined })"
+      >
+        <mat-option value="">ทั้งหมด</mat-option>
+        @for (m of materials()?.items ?? []; track m.id) {
+          <mat-option [value]="m.id">{{ m.code }} · {{ m.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <button mat-button (click)="clearFilters()">ล้างตัวกรอง</button>
+  </div>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  <div class="table-wrap">
+    <table class="history">
+      <thead>
+        <tr>
+          <th>วันที่</th>
+          <th>เลขอ้างอิง</th>
+          <th>ประเภท</th>
+          <th>รายการวัสดุ</th>
+          <th>ผู้ทำรายการ</th>
+          <th>หมายเหตุ</th>
+          @if (canReverse) {
+            <th></th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (t of result()?.items ?? []; track t.id) {
+          <tr [class.reversed]="t.reversedBy">
+            <td class="nowrap">{{ t.createdAt | date }}</td>
+            <td class="nowrap">
+              {{ t.referenceNo }}
+              @if (t.reversedBy) {
+                <div><span class="badge badge-neutral">ยกเลิกแล้ว ({{ t.reversedBy.referenceNo }})</span></div>
+              }
+              @if (t.reversalOf) {
+                <div><span class="badge badge-warn">รายการยกเลิกของ {{ t.reversalOf.referenceNo }}</span></div>
+              }
+            </td>
+            <td>
+              <span class="badge" [class]="t.type === 'IN' ? 'badge badge-ok' : 'badge badge-danger'">
+                {{ typeLabels[t.type] }}
+              </span>
+            </td>
+            <td>
+              <ul class="items">
+                @for (i of t.items; track i.id) {
+                  <li>
+                    {{ i.material.name }}
+                    <strong>{{ t.type === 'IN' ? '+' : '-' }}{{ i.quantity }}</strong> {{ i.material.unit }}
+                  </li>
+                }
+              </ul>
+            </td>
+            <td>{{ t.createdBy.fullName }}</td>
+            <td class="note">{{ t.note ?? '-' }}</td>
+            @if (canReverse) {
+              <td>
+                @if (!t.reversedBy && !t.reversalOf) {
+                  <button
+                    mat-icon-button
+                    (click)="reverse(t)"
+                    matTooltip="ยกเลิกรายการ"
+                    aria-label="ยกเลิกรายการ"
+                  >
+                    <mat-icon>undo</mat-icon>
+                  </button>
+                }
+              </td>
+            }
+          </tr>
+        } @empty {
+          <tr>
+            <td class="empty" [attr.colspan]="canReverse ? 7 : 6">
+              {{ loading() ? 'กำลังโหลด...' : 'ไม่พบรายการตามเงื่อนไขที่เลือก' }}
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <mat-paginator
+    [length]="result()?.meta?.total ?? 0"
+    [pageIndex]="(query().page ?? 1) - 1"
+    [pageSize]="query().limit ?? 20"
+    [pageSizeOptions]="[10, 20, 50, 100]"
+    (page)="onPage($event)"
+  />
+</section>

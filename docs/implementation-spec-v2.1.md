@@ -338,6 +338,10 @@ export class AppError extends Error {
 Filter สต็อกต่ำเทียบสอง column จึงใช้ field reference ของ Prisma:
 `where: { currentQuantity: { lte: prisma.material.fields.minStock } }`
 
+### 4.3.1 รูปแบบข้อมูลใน response
+
+รูปแบบของแต่ละ entity (เช่น `Material` มี `category: { id, name }` และ `StockTransaction` มี `createdBy`, `reversalOf`, `reversedBy` และ `items[].material`) กำหนดไว้เป็น TypeScript ใน `frontend/src/app/shared/models/` ไฟล์เหล่านี้คือ **API contract** ที่ back-end ต้องตอบให้ตรงกัน ส่วน mock API ใน Part 1 ตอบตาม contract นี้แล้ว
+
 ### 4.4 DTO หลัก
 
 ```ts

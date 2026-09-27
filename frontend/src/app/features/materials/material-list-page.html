@@ -1,0 +1,137 @@
+<div class="page-header">
+  <h1>รายการวัสดุ</h1>
+  @if (canCreate) {
+    <a mat-flat-button routerLink="/materials/new">
+      <mat-icon>add</mat-icon>
+      เพิ่มวัสดุ
+    </a>
+  }
+</div>
+
+<section class="card">
+  <div class="filters">
+    <mat-form-field>
+      <mat-label>ค้นหารหัสหรือชื่อวัสดุ</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput [formControl]="search" />
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>หมวดหมู่</mat-label>
+      <mat-select
+        [value]="query().categoryId ?? ''"
+        (selectionChange)="update({ categoryId: $event.value || undefined })"
+      >
+        <mat-option value="">ทั้งหมด</mat-option>
+        @for (c of categories(); track c.id) {
+          <mat-option [value]="c.id">{{ c.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    @if (canEdit) {
+      <mat-form-field>
+        <mat-label>สถานะ</mat-label>
+        <mat-select
+          [value]="query().status ?? 'ACTIVE'"
+          (selectionChange)="update({ status: $event.value === 'ACTIVE' ? undefined : $event.value })"
+        >
+          <mat-option value="ACTIVE">ใช้งาน</mat-option>
+          <mat-option value="INACTIVE">ปิดใช้งาน</mat-option>
+        </mat-select>
+      </mat-form-field>
+    }
+
+    <mat-checkbox
+      [checked]="!!query().lowStock"
+      (change)="update({ lowStock: $event.checked || undefined })"
+    >
+      เฉพาะสต็อกต่ำ
+    </mat-checkbox>
+
+    <button mat-button (click)="clearFilters()">ล้างตัวกรอง</button>
+  </div>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  <div class="table-wrap">
+    <table
+      mat-table
+      [dataSource]="result()?.items ?? []"
+      matSort
+      [matSortActive]="query().sortBy ?? 'code'"
+      [matSortDirection]="query().sortOrder ?? 'asc'"
+      (matSortChange)="onSort($event)"
+    >
+      <ng-container matColumnDef="code">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>รหัส</th>
+        <td mat-cell *matCellDef="let m">{{ m.code }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>ชื่อวัสดุ</th>
+        <td mat-cell *matCellDef="let m">{{ m.name }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="category">
+        <th mat-header-cell *matHeaderCellDef>หมวดหมู่</th>
+        <td mat-cell *matCellDef="let m">{{ m.category.name }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="currentQuantity">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header arrowPosition="before" class="num">
+          คงเหลือ
+        </th>
+        <td mat-cell *matCellDef="let m" class="num">{{ m.currentQuantity }} {{ m.unit }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="minStock">
+        <th mat-header-cell *matHeaderCellDef class="num">จุดสั่งซื้อ</th>
+        <td mat-cell *matCellDef="let m" class="num">{{ m.minStock }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="location">
+        <th mat-header-cell *matHeaderCellDef>ที่จัดเก็บ</th>
+        <td mat-cell *matCellDef="let m">{{ m.location ?? '-' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>สถานะสต็อก</th>
+        <td mat-cell *matCellDef="let m">
+          @if (m.status === 'INACTIVE') {
+            <span class="badge badge-neutral">ปิดใช้งาน</span>
+          } @else {
+            <app-stock-badge [currentQuantity]="m.currentQuantity" [minStock]="m.minStock" />
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let m">
+          <a mat-icon-button [routerLink]="['/materials', m.id, 'edit']" aria-label="แก้ไข">
+            <mat-icon>edit</mat-icon>
+          </a>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="columns()"></tr>
+      <tr mat-row *matRowDef="let row; columns: columns()"></tr>
+      <tr class="mat-row" *matNoDataRow>
+        <td class="empty" [attr.colspan]="columns().length">
+          {{ loading() ? 'กำลังโหลด...' : 'ไม่พบวัสดุตามเงื่อนไขที่เลือก' }}
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <mat-paginator
+    [length]="result()?.meta?.total ?? 0"
+    [pageIndex]="(query().page ?? 1) - 1"
+    [pageSize]="query().limit ?? 20"
+    [pageSizeOptions]="[10, 20, 50, 100]"
+    (page)="onPage($event)"
+  />
+</section>

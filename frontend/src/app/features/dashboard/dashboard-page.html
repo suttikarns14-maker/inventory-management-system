@@ -1,0 +1,168 @@
+<div class="page-header">
+  <h1>ภาพรวมคลัง</h1>
+</div>
+
+<div class="kpis">
+  @let s = summary();
+  <div class="kpi">
+    <span class="kpi-label">วัสดุที่ใช้งานอยู่</span>
+    <span class="kpi-value">{{ s?.activeMaterials ?? '-' }}</span>
+  </div>
+  <div class="kpi" [class.kpi-danger]="(s?.reorderCount ?? 0) > 0">
+    <span class="kpi-label">ต้องสั่งซื้อ</span>
+    <span class="kpi-value">{{ s?.reorderCount ?? '-' }}</span>
+  </div>
+  <div class="kpi" [class.kpi-danger]="(s?.outOfStockCount ?? 0) > 0">
+    <span class="kpi-label">หมดสต็อก</span>
+    <span class="kpi-value">{{ s?.outOfStockCount ?? '-' }}</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-label">ไม่เคยถูกเบิก</span>
+    <span class="kpi-value">{{ s?.neverWithdrawnCount ?? '-' }}</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-label">รายการเบิกเดือนนี้</span>
+    <span class="kpi-value">{{ s?.withdrawalsThisMonth ?? '-' }}</span>
+  </div>
+</div>
+
+<section class="card">
+  <h2>ควรสั่งซื้อ</h2>
+  <p class="muted hint">
+    เรียงตามความเร่งด่วน · อัตราการใช้คิดจากการเบิก 90 วันล่าสุด · จำนวนแนะนำให้พอใช้ 30 วัน
+  </p>
+  <div class="table-wrap">
+    <table class="simple">
+      <thead>
+        <tr>
+          <th>วัสดุ</th>
+          <th class="num">คงเหลือ</th>
+          <th class="num">จุดสั่งซื้อ</th>
+          <th class="num">ใช้เฉลี่ย/วัน</th>
+          <th class="num">เหลือใช้ได้ (วัน)</th>
+          <th class="num">แนะนำสั่ง</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of reorder() ?? []; track r.id) {
+          <tr
+            [class.row-danger]="r.currentQuantity === 0"
+            [class.row-warn]="r.currentQuantity > 0 && r.daysLeft !== null && r.daysLeft <= 7"
+          >
+            <td>
+              <div>{{ r.name }}</div>
+              <div class="muted">{{ r.code }}</div>
+            </td>
+            <td class="num">{{ r.currentQuantity }} {{ r.unit }}</td>
+            <td class="num">{{ r.minStock }}</td>
+            <td class="num">{{ r.avgDailyUsage | number: '1.0-2' }}</td>
+            <td class="num">{{ r.daysLeft ?? '-' }}</td>
+            <td class="num">
+              @if (r.suggestedQty > 0) {
+                <strong>{{ r.suggestedQty }} {{ r.unit }}</strong>
+              } @else {
+                <span class="muted">ถึงจุดสั่งซื้อ ยังไม่มีข้อมูลการใช้</span>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="6" class="empty">
+              {{ reorder() === undefined ? 'กำลังโหลด...' : 'ยังไม่มีวัสดุที่ต้องสั่งซื้อ' }}
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="two-col">
+  <section class="card">
+    <div class="card-head">
+      <h2>เบิกมากที่สุด</h2>
+      <mat-button-toggle-group
+        [value]="topPeriod()"
+        (change)="topPeriod.set($event.value)"
+        hideSingleSelectionIndicator
+        aria-label="ช่วงเวลา"
+      >
+        <mat-button-toggle [value]="30">30 วัน</mat-button-toggle>
+        <mat-button-toggle [value]="90">90 วัน</mat-button-toggle>
+        <mat-button-toggle [value]="365">1 ปี</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+    <mat-button-toggle-group
+      class="sort-toggle"
+      [value]="topSort()"
+      (change)="topSort.set($event.value)"
+      hideSingleSelectionIndicator
+      aria-label="เรียงตาม"
+    >
+      <mat-button-toggle value="quantity">ตามจำนวนที่เบิก</mat-button-toggle>
+      <mat-button-toggle value="count">ตามจำนวนครั้ง</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <ol class="bars">
+      @for (t of top() ?? []; track t.id) {
+        @let value = topSort() === 'count' ? t.withdrawalCount : t.totalQuantity;
+        <li>
+          <div class="bar-label">
+            <span>{{ t.name }}</span>
+            <span class="num">
+              {{ value }} {{ topSort() === 'count' ? 'ครั้ง' : t.unit }}
+            </span>
+          </div>
+          <div class="bar-track"><div class="bar" [style.width]="barWidth(value)"></div></div>
+        </li>
+      } @empty {
+        <li class="empty">{{ top() === undefined ? 'กำลังโหลด...' : 'ไม่มีการเบิกในช่วงนี้' }}</li>
+      }
+    </ol>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>วัสดุที่ไม่ถูกเบิกใช้</h2>
+      <mat-button-toggle-group
+        [value]="unusedDays()"
+        (change)="unusedDays.set($event.value)"
+        hideSingleSelectionIndicator
+        aria-label="ช่วงเวลา"
+      >
+        <mat-button-toggle [value]="null">ไม่เคยเลย</mat-button-toggle>
+        <mat-button-toggle [value]="90">เกิน 90 วัน</mat-button-toggle>
+        <mat-button-toggle [value]="180">เกิน 180 วัน</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+    <div class="table-wrap">
+      <table class="simple">
+        <thead>
+          <tr>
+            <th>วัสดุ</th>
+            <th class="num">ค้างในคลัง</th>
+            <th>เบิกล่าสุด</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (u of unused() ?? []; track u.id) {
+            <tr>
+              <td>
+                <a [routerLink]="['/materials']" [queryParams]="{ search: u.code }">{{ u.name }}</a>
+                <div class="muted">{{ u.code }}</div>
+              </td>
+              <td class="num">{{ u.currentQuantity }} {{ u.unit }}</td>
+              <td>{{ u.lastOutAt ? (u.lastOutAt | date: 'd MMM y') : 'ไม่เคยเบิก' }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="3" class="empty">
+                {{ unused() === undefined ? 'กำลังโหลด...' : 'ไม่มีวัสดุค้างสต็อกตามเงื่อนไขนี้' }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
