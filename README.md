@@ -14,14 +14,19 @@
 
 ## วิธีรัน
 
-**Front-end** (ตอนนี้ใช้ข้อมูลจำลอง ไม่ต้องมี back-end):
+ต้องเปิด **Docker Desktop** ก่อน แล้วเปิด 2 terminal:
 
 ```bash
+# terminal 1: database + API (ครั้งแรกดูขั้นตอนติดตั้งใน backend/README.md)
+cd backend
+npm run db:up
+npm run dev          # http://localhost:3000/api/v1
+
+# terminal 2: หน้าเว็บ
 cd frontend
-npm install
-npm start       # เปิด http://localhost:4200
+npm start            # เปิด http://localhost:4200
 ```
 
-รายละเอียดและบัญชีทดสอบอยู่ใน [frontend/README.md](frontend/README.md)
+Login ด้วย Admin ที่ตั้งไว้ใน `backend/.env` (`SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD`)
 
-**Back-end:** ยังไม่มี จะทำใน Part 2
+รายละเอียด: [backend/README.md](backend/README.md) · [frontend/README.md](frontend/README.md)

@@ -4,10 +4,10 @@ import { MockApi } from './mock-api';
 import { createSeedData } from './mock-seed';
 
 /**
- * Part 1 runs the whole app against an in-browser mock of the API.
- * Part 2: set to false and `ng serve` proxies /api to the real back-end (proxy.conf.json).
+ * true  = in-browser mock API (no back-end needed, data in localStorage).
+ * false = real back-end: `ng serve` proxies /api to localhost:3000 (proxy.conf.json).
  */
-export const USE_MOCK_API = true;
+export const USE_MOCK_API = false;
 
 @Injectable({ providedIn: 'root' })
 export class MockBackend {

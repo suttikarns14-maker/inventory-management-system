@@ -440,7 +440,8 @@ export class MockApi {
   ): TransactionRow {
     const materials = items.map((i) => this.material(i.materialId));
     for (const [i, m] of materials.entries()) {
-      if (m.status !== 'ACTIVE') throw new MockError(400, 'MATERIAL_INACTIVE', `วัสดุ "${m.name}" ถูกปิดใช้งาน`);
+      // A reversal must always be possible, even if the material was switched off since.
+      if (m.status !== 'ACTIVE' && !reversalOfId) throw new MockError(400, 'MATERIAL_INACTIVE', `วัสดุ "${m.name}" ถูกปิดใช้งาน`);
       if (type === 'OUT' && m.currentQuantity < items[i].quantity) {
         throw new MockError(
           400,

@@ -49,7 +49,8 @@ const NAV: NavItem[] = [
 export class Shell {
   private auth = inject(AuthService);
   private router = inject(Router);
-  private mock = inject(MockBackend);
+  // Only create the mock store when the mock is on; otherwise it would seed localStorage for nothing.
+  private mock = USE_MOCK_API ? inject(MockBackend) : null;
 
   protected readonly useMock = USE_MOCK_API;
   protected readonly user = this.auth.user;
@@ -79,7 +80,7 @@ export class Shell {
 
   protected resetData(): void {
     if (confirm('ล้างข้อมูลทั้งหมดและกลับไปใช้ข้อมูลตัวอย่างเริ่มต้น?')) {
-      this.mock.reset();
+      this.mock?.reset();
       location.reload();
     }
   }

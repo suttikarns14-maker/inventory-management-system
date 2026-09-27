@@ -1,6 +1,6 @@
 # Project Status: ระบบฐานข้อมูลคลังวัสดุ
 
-**อัปเดตล่าสุด:** 2026-09-27 · **ขั้นปัจจุบัน:** Part 1 เสร็จแล้ว รอเริ่ม Part 2
+**อัปเดตล่าสุด:** 2026-09-27 · **ขั้นปัจจุบัน:** Part 2 เสร็จแล้ว (branch `feat/backend`) ระบบ FE + BE + DB ใช้งานได้บนเครื่อง
 
 สัญลักษณ์: ✅ เสร็จ · 🔄 กำลังทำ · ⏳ รอยืนยัน · ⬜ ยังไม่เริ่ม
 
@@ -10,7 +10,7 @@
 
 | # | เรื่อง | ข้อเสนอตอนนี้ | กระทบ | ต้องตอบก่อน |
 |---|---|---|---|---|
-| S2 | หมวดหมู่ตั้งต้นใน seed | 5 หมวดเดียวกับข้อมูลจำลอง (สำนักงาน, ไฟฟ้า, ทำความสะอาด, คอมพิวเตอร์, ซ่อมบำรุง) | `prisma/seed.ts` | Part 2 |
+| — | ไม่มีเรื่องที่รอยืนยัน | | | |
 
 รายละเอียดอยู่ใน [implementation-spec-v2.1.md §10](implementation-spec-v2.1.md)
 
@@ -27,6 +27,7 @@
 | D5 | จำนวนวัสดุ | จำนวนเต็มเสมอ |
 | D6 | แก้รหัสวัสดุหลังสร้างแล้ว | ได้ (ADMIN) ถ้าไม่ซ้ำ เพื่อความยืดหยุ่น |
 | D8 | Login | ใช้ username ข้อความธรรมดา (เช่น `Admin`) ไม่ใช้ email · ตัวพิมพ์เล็กใหญ่ไม่มีผล |
+| S2 | หมวดหมู่ตั้งต้น | 5 หมวดเดียวกับข้อมูลจำลอง |
 | S1 | Admin คนแรก | username `Admin` · รหัสผ่านใส่ใน `backend/.env` (ไม่ขึ้น Git) |
 | D7 | Back-end | Node.js 24 + TypeScript + Express 5 + Prisma + Zod · PostgreSQL 16 บน Docker |
 | — | สิทธิ์ของแต่ละ role | ADMIN ทำได้ทุกอย่าง · STAFF รับเข้า เบิกจ่าย และเพิ่มวัสดุ · USER เบิกได้อย่างเดียว |
@@ -61,14 +62,17 @@
 
 **ยังไม่ได้ทำ (ตั้งใจ):** ปรับหน้าตา UI ละเอียด ทำทีหลังตามที่ตกลงไว้ · ตารางบนมือถือยังค่อนข้างแน่น
 
-### Part 2: Back-end + ต่อระบบ ⬜
-- [ ] Docker Compose + `.env.example` + Prisma schema และ migration (รวม `CHECK` constraints)
-- [ ] Seed ข้อมูล: Admin คนแรกจาก `.env` + หมวดหมู่ตั้งต้น (S2)
-- [ ] Express app: error handling, auth (cookie), role middleware
-- [ ] API: auth, users, categories, materials, inventory (รวม reverse), dashboard
-- [ ] Test ฝั่ง BE: เบิกเกินยอด, เบิกพร้อมกัน, จำนวนติดลบ, วัสดุซ้ำ, สิทธิ์แต่ละ role, ยกเลิกซ้ำ
-- [ ] ปิด mock ใน FE (`USE_MOCK_API = false`) แล้วต่อ BE จริงผ่าน `proxy.conf.json` (ตั้งไว้แล้ว) และทดสอบทุกหน้าอีกครั้ง
-- [ ] Response ของ BE ต้องตรงกับ `frontend/src/app/shared/models/` (สเปก §4.3.1)
+### Part 2: Back-end + ต่อระบบ ✅ (branch `feat/backend`)
+- [x] 1. Database: `backend/docker-compose.yml` (PostgreSQL 16 + DB แยกสำหรับ test), `.env.example`, Prisma 7 schema + migration (`timestamptz`, `CHECK` 3 ตัว, unique `lower(username)`), seed Admin + 5 หมวดหมู่
+- [x] 2. โครง BE: Express 5, error envelope ตามสเปก §4.2, Zod 4 (ข้อความไทย), helmet, JSON-only
+- [x] 3. Auth + ผู้ใช้: login ด้วย username (ไม่สนตัวพิมพ์เล็กใหญ่), JWT ใน HttpOnly cookie, rate limit 5 ครั้ง/15 นาที, role guard, API จัดการผู้ใช้
+- [x] 4. วัสดุ + หมวดหมู่: ค้นหา, กรอง, สต็อกต่ำ (field reference), sort, แบ่งหน้า, กันรหัส/ชื่อซ้ำ
+- [x] 5. รับเข้า/เบิกจ่าย: หักสต็อกแบบมีเงื่อนไขใน DB transaction, เลขอ้างอิงรายวัน, ยกเลิกรายการ, ประวัติ
+- [x] 6. Dashboard: สรุป KPI, ควรสั่งซื้อ, เบิกมากที่สุด, ไม่ถูกเบิกใช้ (ไม่นับรายการที่ยกเลิก)
+- [x] 7. ต่อ FE กับ BE จริง (`USE_MOCK_API = false`)
+- [x] Test BE 27 ข้อกับ PostgreSQL จริง (รวมเบิกพร้อมกัน 12 คำขอ และยกเลิกพร้อมกัน) + browser 44 ข้อกับ BE จริงครบ 3 role ผ่านทั้งหมด
+
+**ข้อสังเกต:** `@prisma/adapter-pg` 7.10 พิมพ์ DeprecationWarning ของ pg ตอนรัน transaction เป็นปัญหาภายในไลบรารี ไม่กระทบการทำงาน รออัปเดตจาก Prisma
 
 ### ส่งมอบ ⬜
 - [ ] วิธีติดตั้งและรันใน README
