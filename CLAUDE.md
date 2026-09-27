@@ -94,7 +94,7 @@ Secrets อยู่ใน `.env` เท่านั้น ห้าม commit `
 
 - TypeScript strict ทั้งสองฝั่ง ห้ามใช้ `any` ถ้าไม่จำเป็นจริงๆ
 - ข้อความที่ผู้ใช้เห็นเป็นภาษาไทย ส่วนโค้ด ชื่อตัวแปร และ commit message เป็นภาษาอังกฤษ
-- Branch: `feat/...`, `fix/...`, `chore/...` และห้าม commit ตรงไปที่ `main`
+- Branch: `feat/...`, `fix/...`, `chore/...` แตกจาก `develop` แล้ว merge กลับเข้า `develop` ส่วน `main` รับ merge จาก `develop` เมื่อพร้อมปล่อยเท่านั้น ห้าม commit ตรงไปที่ `main` หรือ `develop`
 
 ## Commands
 
