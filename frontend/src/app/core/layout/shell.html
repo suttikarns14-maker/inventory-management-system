@@ -1,0 +1,66 @@
+<mat-sidenav-container class="shell">
+  <mat-sidenav
+    #sidenav
+    class="shell-nav"
+    [mode]="isMobile() ? 'over' : 'side'"
+    [opened]="!isMobile()"
+  >
+    <div class="brand">
+      <mat-icon>warehouse</mat-icon>
+      <span>คลังวัสดุ</span>
+    </div>
+    <mat-nav-list>
+      @for (item of nav(); track item.path) {
+        <a
+          mat-list-item
+          [routerLink]="item.path"
+          routerLinkActive
+          #rla="routerLinkActive"
+          [activated]="rla.isActive"
+          (click)="isMobile() && sidenav.close()"
+        >
+          <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+          <span matListItemTitle>{{ item.label }}</span>
+        </a>
+      }
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <mat-sidenav-content>
+    <mat-toolbar class="shell-toolbar">
+      @if (isMobile()) {
+        <button mat-icon-button (click)="sidenav.toggle()" aria-label="เปิดเมนู">
+          <mat-icon>menu</mat-icon>
+        </button>
+      }
+      <span class="spacer"></span>
+      @if (useMock) {
+        <span class="mock-chip" title="ข้อมูลทั้งหมดเก็บอยู่ใน browser นี้เท่านั้น">ข้อมูลจำลอง</span>
+      }
+      <button mat-button [matMenuTriggerFor]="userMenu">
+        <mat-icon>account_circle</mat-icon>
+        {{ user()?.fullName }}
+      </button>
+      <mat-menu #userMenu="matMenu" xPosition="before">
+        <div class="menu-user">
+          <div>{{ user()?.email }}</div>
+          <div class="muted">{{ roleLabel() }}</div>
+        </div>
+        @if (useMock) {
+          <button mat-menu-item (click)="resetData()">
+            <mat-icon>restart_alt</mat-icon>
+            <span>รีเซ็ตข้อมูลตัวอย่าง</span>
+          </button>
+        }
+        <button mat-menu-item (click)="logout()">
+          <mat-icon>logout</mat-icon>
+          <span>ออกจากระบบ</span>
+        </button>
+      </mat-menu>
+    </mat-toolbar>
+
+    <main class="shell-main">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

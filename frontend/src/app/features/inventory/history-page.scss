@@ -1,0 +1,39 @@
+.history {
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: 10px 8px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+  }
+
+  th {
+    font: var(--mat-sys-label-large);
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  tr.reversed td {
+    color: var(--mat-sys-on-surface-variant);
+    text-decoration: line-through;
+    text-decoration-color: var(--mat-sys-outline);
+  }
+
+  tr.reversed .badge {
+    text-decoration: none;
+  }
+}
+
+.items {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.note {
+  max-width: 240px;
+}

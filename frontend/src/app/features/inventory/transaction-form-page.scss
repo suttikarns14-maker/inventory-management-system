@@ -1,0 +1,45 @@
+.type-toggle {
+  margin-bottom: 20px;
+}
+
+.lines {
+  border-collapse: collapse;
+  margin-bottom: 16px;
+
+  th {
+    padding: 8px;
+    text-align: left;
+    font: var(--mat-sys-label-large);
+    color: var(--mat-sys-on-surface-variant);
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+  }
+
+  td {
+    padding: 8px;
+    vertical-align: top;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+  }
+
+  td:first-child {
+    min-width: 200px;
+    padding-top: 16px;
+  }
+
+  td.num {
+    padding-top: 16px;
+    white-space: nowrap;
+  }
+}
+
+.qty {
+  width: 180px;
+}
+
+.note {
+  margin-top: 8px;
+}
+
+.count {
+  margin-right: auto;
+  align-self: center;
+}

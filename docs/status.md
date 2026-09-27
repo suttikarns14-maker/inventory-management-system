@@ -1,6 +1,6 @@
 # Project Status: ระบบฐานข้อมูลคลังวัสดุ
 
-**อัปเดตล่าสุด:** 2026-09-28 · **ขั้นปัจจุบัน:** Setup เสร็จแล้ว รอเริ่ม Part 1
+**อัปเดตล่าสุด:** 2026-09-27 · **ขั้นปัจจุบัน:** Part 1 เสร็จแล้ว รอเริ่ม Part 2
 
 สัญลักษณ์: ✅ เสร็จ · 🔄 กำลังทำ · ⏳ รอยืนยัน · ⬜ ยังไม่เริ่ม
 
@@ -42,21 +42,20 @@
 - [x] CLAUDE.md, README.md, .gitignore, โครง `backend/`
 - [x] Commit + push branch `chore/project-setup`
 
-### Part 1: Front-end + Mock API ⬜
-**รอบที่ 1: โครงและตัวอย่าง** (ให้ผู้ใช้ตรวจก่อนทำรอบ 2)
-- [ ] สร้างโปรเจกต์ด้วย Angular CLI + Angular Material ใน `frontend/`
-- [ ] Models ตามสเปก §4 และ mock API interceptor ที่เก็บข้อมูลใน localStorage พร้อมข้อมูลตัวอย่าง
-- [ ] `AuthService`, `authGuard`, `authInterceptor` และ shell/sidebar ตาม role
-- [ ] หน้า Login (บัญชีทดสอบ 3 role) และหน้า 403
-- [ ] หน้ารายการวัสดุ: ค้นหา, กรอง, สต็อกต่ำ, sort, แบ่งหน้า
+### Part 1: Front-end + Mock API ✅ (branch `feat/frontend-mock`)
+- [x] โปรเจกต์ Angular 22 (standalone, zoneless) + Angular Material + ฟอนต์ Kanit ใน `frontend/`
+- [x] Models (API contract) ใน `shared/models/` และ mock API ครบทุก endpoint ในสเปก §4.3 พร้อมข้อมูลตัวอย่าง 6 เดือน (30 วัสดุ, 5 หมวด, 5 ผู้ใช้) เก็บใน localStorage
+- [x] `AuthService`, `authGuard`, `authInterceptor` และ layout ที่แสดงเมนูตาม role
+- [x] หน้า Login (บัญชีทดสอบ 3 role) และหน้า 403
+- [x] หน้ารายการวัสดุ: ค้นหา, กรอง, สต็อกต่ำ, sort, แบ่งหน้า (สถานะเก็บใน URL)
+- [x] ฟอร์มเพิ่ม/แก้ไขวัสดุ (แก้รหัสได้ตาม D6 และห้ามแก้ยอดคงเหลือ)
+- [x] ฟอร์มรับเข้า/เบิกจ่ายหลายรายการ, เตือนเกินยอดทันที และ USER เห็นเฉพาะโหมดเบิก
+- [x] หน้าประวัติ (USER เห็นเฉพาะของตัวเอง) + ยกเลิกรายการ (ADMIN)
+- [x] Dashboard: KPI 5 ตัว, ควรสั่งซื้อ, เบิกมากที่สุด, ไม่ถูกเบิกใช้
+- [x] หน้าตั้งค่าผู้ใช้และหมวดหมู่ (ADMIN)
+- [x] Unit test ของ mock API 10 ข้อ + ทดสอบใน browser ครบ 3 role และหน้าจอมือถือ 43 ข้อ ผ่านทั้งหมด
 
-**รอบที่ 2: หน้าที่เหลือ**
-- [ ] ฟอร์มเพิ่ม/แก้ไขวัสดุ
-- [ ] ฟอร์มรับเข้า/เบิกจ่ายหลายรายการ และเตือนเมื่อเกินยอด
-- [ ] หน้าประวัติ + ยกเลิกรายการ (ADMIN)
-- [ ] Dashboard: KPI, ควรสั่งซื้อ, เบิกมากที่สุด, ไม่เคยเบิก
-- [ ] หน้าตั้งค่าผู้ใช้และหมวดหมู่
-- [ ] ทดสอบทุกหน้าด้วยทั้ง 3 role
+**ยังไม่ได้ทำ (ตั้งใจ):** ปรับหน้าตา UI ละเอียด ทำทีหลังตามที่ตกลงไว้ · ตารางบนมือถือยังค่อนข้างแน่น
 
 ### Part 2: Back-end + ต่อระบบ ⬜
 - [ ] Docker Compose + `.env.example` + Prisma schema และ migration (รวม `CHECK` constraints)
@@ -64,7 +63,8 @@
 - [ ] Express app: error handling, auth (cookie), role middleware
 - [ ] API: auth, users, categories, materials, inventory (รวม reverse), dashboard
 - [ ] Test ฝั่ง BE: เบิกเกินยอด, เบิกพร้อมกัน, จำนวนติดลบ, วัสดุซ้ำ, สิทธิ์แต่ละ role, ยกเลิกซ้ำ
-- [ ] ปิด mock ใน FE แล้วต่อ BE จริงผ่าน `proxy.conf.json` และทดสอบทุกหน้าอีกครั้ง
+- [ ] ปิด mock ใน FE (`USE_MOCK_API = false`) แล้วต่อ BE จริงผ่าน `proxy.conf.json` (ตั้งไว้แล้ว) และทดสอบทุกหน้าอีกครั้ง
+- [ ] Response ของ BE ต้องตรงกับ `frontend/src/app/shared/models/` (สเปก §4.3.1)
 
 ### ส่งมอบ ⬜
 - [ ] วิธีติดตั้งและรันใน README
