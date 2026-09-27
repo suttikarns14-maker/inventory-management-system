@@ -1,0 +1,146 @@
+<div class="page-header">
+  <h1>{{ canReceive ? 'รับเข้า / เบิกจ่าย' : 'เบิกวัสดุ' }}</h1>
+  <a mat-button routerLink="/inventory/history">
+    <mat-icon>history</mat-icon>
+    ดูประวัติ
+  </a>
+</div>
+
+<form class="card" [formGroup]="form" (ngSubmit)="submit()">
+  @if (canReceive) {
+    <mat-button-toggle-group
+      class="type-toggle"
+      formControlName="type"
+      aria-label="ประเภทรายการ"
+      hideSingleSelectionIndicator
+    >
+      <mat-button-toggle value="OUT">
+        <mat-icon>remove_circle_outline</mat-icon>
+        เบิกจ่าย (-)
+      </mat-button-toggle>
+      <mat-button-toggle value="IN">
+        <mat-icon>add_circle_outline</mat-icon>
+        รับเข้า (+)
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+  }
+
+  <mat-form-field class="full">
+    <mat-label>ค้นหาวัสดุเพื่อเพิ่มในรายการ</mat-label>
+    <mat-icon matPrefix>search</mat-icon>
+    <input
+      matInput
+      [formControl]="picker"
+      [matAutocomplete]="auto"
+      placeholder="พิมพ์รหัสหรือชื่อวัสดุ"
+    />
+    <mat-autocomplete
+      #auto="matAutocomplete"
+      [displayWith]="blank"
+      (optionSelected)="add($event.option.value)"
+    >
+      @for (m of options(); track m.id) {
+        <mat-option [value]="m">
+          {{ m.code }} · {{ m.name }}
+          <span class="muted">(คงเหลือ {{ m.currentQuantity }} {{ m.unit }})</span>
+        </mat-option>
+      } @empty {
+        <mat-option disabled>ไม่พบวัสดุที่ใช้งานอยู่</mat-option>
+      }
+    </mat-autocomplete>
+  </mat-form-field>
+
+  @if (items.length) {
+    <div class="table-wrap" formArrayName="items">
+      <table class="lines">
+        <thead>
+          <tr>
+            <th>วัสดุ</th>
+            <th class="num">คงเหลือ</th>
+            <th>จำนวน{{ typeLabel() }}</th>
+            @if (type() === 'IN') {
+              <th>ราคาต่อหน่วย (บาท)</th>
+            }
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (line of items.controls; track line; let i = $index) {
+            @let m = line.controls.material.value;
+            <tr [formGroupName]="i">
+              <td>
+                <div>{{ m.name }}</div>
+                <div class="muted">{{ m.code }}</div>
+              </td>
+              <td class="num">{{ m.currentQuantity }} {{ m.unit }}</td>
+              <td>
+                <mat-form-field class="qty">
+                  <input
+                    matInput
+                    type="number"
+                    min="1"
+                    step="1"
+                    formControlName="quantity"
+                    [id]="'qty-' + m.id"
+                    [errorStateMatcher]="errorMatcher"
+                    [attr.aria-label]="'จำนวน ' + m.name"
+                  />
+                  <span matTextSuffix>{{ m.unit }}</span>
+                  @let q = line.controls.quantity;
+                  @if (q.hasError('exceedsStock')) {
+                    <mat-error>เกินยอดคงเหลือ (มี {{ q.getError('exceedsStock') }} {{ m.unit }})</mat-error>
+                  } @else if (q.hasError('server')) {
+                    <mat-error>{{ q.getError('server') }}</mat-error>
+                  } @else if (q.hasError('positiveInteger')) {
+                    <mat-error>ต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป</mat-error>
+                  } @else {
+                    <mat-error>กรุณากรอกจำนวน</mat-error>
+                  }
+                </mat-form-field>
+              </td>
+              @if (type() === 'IN') {
+                <td>
+                  <mat-form-field class="qty">
+                    <input
+                      matInput
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      formControlName="unitPrice"
+                      placeholder="ไม่บังคับ"
+                      [attr.aria-label]="'ราคาต่อหน่วย ' + m.name"
+                    />
+                    <mat-error>ราคาต้องไม่ติดลบ</mat-error>
+                  </mat-form-field>
+                </td>
+              }
+              <td>
+                <button mat-icon-button type="button" (click)="remove(i)" aria-label="ลบรายการ">
+                  <mat-icon>delete_outline</mat-icon>
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <p class="empty">ยังไม่มีรายการ ค้นหาวัสดุด้านบนเพื่อเพิ่ม</p>
+  }
+
+  <mat-form-field class="full note">
+    <mat-label>หมายเหตุ</mat-label>
+    <textarea matInput rows="2" formControlName="note" placeholder="เช่น เบิกใช้งานแผนกบัญชี"></textarea>
+  </mat-form-field>
+
+  <div class="actions">
+    <span class="muted count">{{ items.length }} รายการ</span>
+    <button
+      mat-flat-button
+      type="submit"
+      [disabled]="saving() || items.length === 0 || form.invalid"
+    >
+      {{ saving() ? 'กำลังบันทึก...' : 'ยืนยันรายการ' + typeLabel() }}
+    </button>
+  </div>
+</form>
