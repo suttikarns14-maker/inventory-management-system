@@ -10,6 +10,9 @@ export interface MaterialBrief {
   id: string;
   code: string;
   name: string;
+  /** Shown next to the name: materials with the same name differ by brand/model. */
+  brand: string | null;
+  model: string | null;
   unit: string;
 }
 

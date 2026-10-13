@@ -38,9 +38,9 @@ export async function summary() {
 
 export async function reorderSuggestions() {
   const rows = await prisma.$queryRaw<
-    { id: string; code: string; name: string; unit: string; currentQuantity: number; minStock: number; used: number }[]
+    { id: string; code: string; name: string; brand: string | null; model: string | null; unit: string; currentQuantity: number; minStock: number; used: number }[]
   >`
-    SELECT m.id, m.code, m.name, m.unit,
+    SELECT m.id, m.code, m.name, m.brand, m.model, m.unit,
            m.current_quantity AS "currentQuantity", m.min_stock AS "minStock",
            COALESCE(u.used, 0)::int AS used
     FROM materials m
@@ -78,9 +78,9 @@ export function topWithdrawn(q: z.infer<typeof topWithdrawnSchema>) {
   const from = q.from ? bangkokDayStart(q.from) : new Date(to.getTime() - 30 * DAY_MS);
   const orderBy = q.sortBy === 'count' ? Prisma.sql`"withdrawalCount"` : Prisma.sql`"totalQuantity"`;
   return prisma.$queryRaw<
-    { id: string; code: string; name: string; unit: string; totalQuantity: number; withdrawalCount: number }[]
+    { id: string; code: string; name: string; brand: string | null; model: string | null; unit: string; totalQuantity: number; withdrawalCount: number }[]
   >`
-    SELECT m.id, m.code, m.name, m.unit,
+    SELECT m.id, m.code, m.name, m.brand, m.model, m.unit,
            SUM(i.quantity)::int AS "totalQuantity",
            COUNT(DISTINCT t.id)::int AS "withdrawalCount"
     FROM stock_transaction_items i
@@ -98,9 +98,9 @@ export function topWithdrawn(q: z.infer<typeof topWithdrawnSchema>) {
 export function unused(days: number | undefined) {
   const cutoff = days ? daysAgo(days) : null;
   return prisma.$queryRaw<
-    { id: string; code: string; name: string; unit: string; currentQuantity: number; createdAt: Date; lastOutAt: Date | null }[]
+    { id: string; code: string; name: string; brand: string | null; model: string | null; unit: string; currentQuantity: number; createdAt: Date; lastOutAt: Date | null }[]
   >`
-    SELECT m.id, m.code, m.name, m.unit, m.current_quantity AS "currentQuantity",
+    SELECT m.id, m.code, m.name, m.brand, m.model, m.unit, m.current_quantity AS "currentQuantity",
            m.created_at AS "createdAt", lo.last_out_at AS "lastOutAt"
     FROM materials m
     LEFT JOIN LATERAL (

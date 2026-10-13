@@ -52,7 +52,7 @@
           >
             <td>
               <div>{{ r.name }}</div>
-              <div class="muted">{{ r.code }}</div>
+              <div class="muted">{{ detail(r) }}</div>
             </td>
             <td class="num">{{ r.currentQuantity }} {{ r.unit }}</td>
             <td class="num">{{ r.minStock }}</td>
@@ -109,7 +109,10 @@
         @let value = topSort() === 'count' ? t.withdrawalCount : t.totalQuantity;
         <li>
           <div class="bar-label">
-            <span>{{ t.name }}</span>
+            <span>
+              {{ t.name }}
+              <span class="muted brand">{{ detail(t) }}</span>
+            </span>
             <span class="num">
               {{ value }} {{ topSort() === 'count' ? 'ครั้ง' : t.unit }}
             </span>
@@ -150,7 +153,7 @@
             <tr>
               <td>
                 <a [routerLink]="['/materials']" [queryParams]="{ search: u.code }">{{ u.name }}</a>
-                <div class="muted">{{ u.code }}</div>
+                <div class="muted">{{ detail(u) }}</div>
               </td>
               <td class="num">{{ u.currentQuantity }} {{ u.unit }}</td>
               <td class="nowrap">{{ u.lastOutAt ? (u.lastOutAt | date: 'd MMM y') : 'ไม่เคยเบิก' }}</td>

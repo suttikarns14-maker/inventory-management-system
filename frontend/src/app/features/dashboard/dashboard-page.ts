@@ -5,7 +5,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
 import { catchError, combineLatest, of, OperatorFunction, switchMap } from 'rxjs';
-import { TopWithdrawnSort } from '../../shared/models/dashboard';
+import { MaterialBrief, TopWithdrawnSort } from '../../shared/models/dashboard';
 import { Notify } from '../../shared/services/notify';
 import { bangkokDate, daysAgo } from '../../shared/utils/date';
 import { DashboardService } from './dashboard.service';
@@ -68,6 +68,11 @@ export class DashboardPage {
     ),
     { initialValue: undefined },
   );
+
+  /** "CODE · brand · model": same-named materials are told apart by brand and model. */
+  protected detail(m: MaterialBrief): string {
+    return [m.code, m.brand, m.model].filter((x) => x && x !== '-').join(' · ');
+  }
 
   protected barWidth(value: number): string {
     return `${Math.max(2, (value / this.topMax()) * 100)}%`;
