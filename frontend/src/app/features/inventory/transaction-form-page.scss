@@ -2,37 +2,110 @@
   margin-bottom: 20px;
 }
 
-.lines {
-  border-collapse: collapse;
-  margin-bottom: 16px;
+.header {
+  margin-bottom: 8px;
 
-  th {
-    padding: 8px;
-    text-align: left;
-    font: var(--mat-sys-label-large);
-    color: var(--mat-sys-on-surface-variant);
-    border-bottom: 1px solid var(--mat-sys-outline-variant);
-  }
+  .span-2 {
+    grid-column: span 2;
 
-  td {
-    padding: 8px;
-    vertical-align: top;
-    border-bottom: 1px solid var(--mat-sys-outline-variant);
-  }
-
-  td:first-child {
-    min-width: 200px;
-    padding-top: 16px;
-  }
-
-  td.num {
-    padding-top: 16px;
-    white-space: nowrap;
+    @media (max-width: 599px) {
+      grid-column: auto;
+    }
   }
 }
 
+.requester-self {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
+  .muted {
+    font: var(--mat-sys-label-medium);
+  }
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.line {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.line-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  .badge {
+    margin-left: 6px;
+  }
+}
+
+.line-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 8px;
+}
+
 .qty {
-  width: 180px;
+  width: 200px;
+}
+
+.serials {
+  flex: 1 1 320px;
+
+  textarea {
+    font-family: ui-monospace, monospace;
+  }
+}
+
+.unit-search {
+  flex: 1 1 320px;
+}
+
+.auto-add {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+
+  .count {
+    width: 100px;
+  }
+}
+
+.chosen {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  // room for the floating label of the first field inside the scroll area
+  padding-top: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.chosen-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .sn {
+    min-width: 180px;
+    font-family: ui-monospace, monospace;
+    word-break: break-all;
+  }
+
+  .remark {
+    flex: 1;
+  }
 }
 
 .note {

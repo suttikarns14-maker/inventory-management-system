@@ -9,7 +9,8 @@ import {
   UnusedMaterial,
 } from '../../shared/models/dashboard';
 import { bangkokDate, bangkokDayStart, DAY_MS } from '../../shared/utils/date';
-import { MaterialRow, MockStore, TransactionRow, UserRow } from './mock-db';
+import { FLOORS } from '../../shared/models/lookup';
+import { DepartmentRow, LookupRow, MaterialRow, MockStore, TransactionRow, UserRow } from './mock-db';
 
 // In-browser stand-in for the Part 2 back-end. It follows spec §4 (routes, roles, error codes,
 // response envelope) so the Angular app cannot tell the difference. Business logic here only
@@ -131,6 +132,20 @@ export class MockApi {
     r('GET', '/inventory/transactions/:id', (c, [id]) => this.getTransaction(c, id));
     r('POST', '/inventory/transactions/:id/reverse', (c, [id]) => this.reverse(c, id));
     r('GET', '/inventory/history', (c) => this.history(c));
+
+    r('GET', '/users/options', (c) => (this.auth(c, 'ADMIN', 'STAFF'), ok(this.db.users.filter((u) => u.isActive).map(({ id, username, fullName }) => ({ id, username, fullName })))));
+    r('GET', '/lookups', (c) => (this.auth(c), ok({ departments: this.db.departments, buildings: this.db.buildings, storageLocations: this.db.storageLocations, floors: FLOORS })));
+    r('POST', '/lookups/:kind', (c, [kind]) => this.saveLookup(c, kind!));
+    r('PUT', '/lookups/:kind/:id', (c, [kind, id]) => this.saveLookup(c, kind!, id));
+    // ponytail: serial numbers and Excel import need the real back-end.
+    r('GET', '/materials/:id/units', (c) => (this.auth(c), paged([], c.req.query)));
+    r('GET', '/units', (c) => (this.auth(c, 'ADMIN', 'STAFF'), paged([], c.req.query)));
+    for (const path of ['/import/initial/preview', '/import/initial/commit', '/import/receipt/preview', '/import/receipt/commit', '/import/receipt/template']) {
+      r(path.endsWith('template') ? 'GET' : 'POST', path, (c) => {
+        this.auth(c, 'ADMIN');
+        throw new MockError(400, 'VALIDATION_ERROR', 'การนำเข้าจาก Excel ต้องใช้กับ back-end จริง (ปิดโหมดข้อมูลจำลอง)');
+      });
+    }
 
     r('GET', '/dashboard/summary', (c) => this.summary(c));
     r('GET', '/dashboard/reorder-suggestions', (c) => (this.auth(c, 'ADMIN', 'STAFF'), ok(this.reorder())));
@@ -323,7 +338,12 @@ export class MockApi {
 
   private toMaterial(m: MaterialRow): Material {
     const category = this.db.categories.find((c) => c.id === m.categoryId)!;
-    return { ...m, category: { id: category.id, name: category.name } };
+    const loc = this.db.storageLocations.find((l) => l.id === m.storageLocationId);
+    return {
+      ...m,
+      category: { id: category.id, name: category.name },
+      storageLocation: loc ? { id: loc.id, name: loc.name } : null,
+    };
   }
 
   private listMaterials(c: Ctx): MockResponse {
@@ -342,7 +362,9 @@ export class MockApi {
       .filter((m) => m.status === status)
       .filter((m) => !categoryId || m.categoryId === categoryId)
       .filter((m) => !lowStock || m.currentQuantity <= m.minStock)
-      .filter((m) => !search || m.code.toLowerCase().includes(search) || m.name.toLowerCase().includes(search))
+      .filter((m) => !q.get('storageLocationId') || m.storageLocationId === q.get('storageLocationId'))
+      .filter((m) => !q.get('trackingType') || m.trackingType === q.get('trackingType'))
+      .filter((m) => !search || [m.code, m.name, m.brand ?? '', m.model ?? ''].some((x) => x.toLowerCase().includes(search)))
       .sort((a, b) => {
         const x = a[sortBy];
         const y = b[sortBy];
@@ -359,7 +381,13 @@ export class MockApi {
     const code = v.str('code', 'รหัสวัสดุ', { max: 50 });
     const name = v.str('name', 'ชื่อวัสดุ');
     const unit = v.str('unit', 'หน่วยนับ', { max: 30 });
-    const location = v.str('location', 'ตำแหน่งจัดเก็บ', { required: false, max: 50 });
+    const brand = v.str('brand', 'ยี่ห้อ', { required: false, max: 100 });
+    const model = v.str('model', 'รุ่น', { required: false, max: 100 });
+    const storageLocationId = v.str('storageLocationId', 'สถานที่เก็บ', { required: false });
+    // ponytail: the mock has no serial units; SERIAL materials need the real back-end.
+    if (c.body['trackingType'] === 'SERIAL') {
+      v.errors.push({ field: 'trackingType', message: 'โหมดข้อมูลจำลองรองรับเฉพาะแบบยอดรวม (รายชิ้นต้องใช้ back-end จริง)' });
+    }
     const minStock = v.int('minStock', 'จุดสั่งซื้อ', 0);
     const categoryId = v.str('categoryId', 'หมวดหมู่');
     if (categoryId && !this.db.categories.some((x) => x.id === categoryId)) {
@@ -371,7 +399,19 @@ export class MockApi {
       throw new MockError(409, 'DUPLICATE_CODE', 'รหัสวัสดุนี้มีอยู่แล้ว', [{ field: 'code', message: 'รหัสวัสดุนี้มีอยู่แล้ว' }]);
     }
     const now = new Date().toISOString();
-    const fields = { code: code!, name: name!, unit: unit!, location, minStock, categoryId: categoryId!, status, updatedAt: now };
+    const fields = {
+      code: code!,
+      name: name!,
+      brand,
+      model,
+      unit: unit!,
+      storageLocationId,
+      trackingType: 'QUANTITY' as const,
+      minStock,
+      categoryId: categoryId!,
+      status,
+      updatedAt: now,
+    };
     if (existing) {
       Object.assign(existing, fields); // currentQuantity is deliberately untouched
       return ok(this.toMaterial(existing));
@@ -395,11 +435,25 @@ export class MockApi {
       reversalOf: ref(this.db.transactions.find((x) => x.id === t.reversalOfId)),
       reversedBy: ref(this.db.transactions.find((x) => x.reversalOfId === t.id)),
       createdAt: t.createdAt,
+      fiscalYear: t.fiscalYear,
+      projectName: t.projectName,
+      requesterName: t.requesterName,
+      requester: t.requesterId ? { id: t.requesterId, fullName: this.db.users.find((u) => u.id === t.requesterId)?.fullName ?? t.requesterName } : null,
+      requestingDepartment: this.refOf(this.db.departments, t.requestingDepartmentId),
+      usingDepartment: this.refOf(this.db.departments, t.usingDepartmentId),
+      building: this.refOf(this.db.buildings, t.buildingId),
+      floor: t.floor,
+      purpose: t.purpose,
       items: t.items.map((i) => {
         const m = this.material(i.materialId);
-        return { ...i, material: { id: m.id, code: m.code, name: m.name, unit: m.unit } };
+        return { ...i, units: [], material: { id: m.id, code: m.code, name: m.name, unit: m.unit, trackingType: m.trackingType } };
       }),
     };
+  }
+
+  private refOf(rows: LookupRow[], id: string | null) {
+    const row = id ? rows.find((r) => r.id === id) : undefined;
+    return row ? { id: row.id, name: row.name } : null;
   }
 
   private createTransaction(c: Ctx): MockResponse {
@@ -427,7 +481,48 @@ export class MockApi {
     }
     v.check();
     if (type === 'IN' && user.role === 'USER') throw new MockError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์บันทึกรับเข้า');
-    return ok(this.toTransaction(this.applyTransaction(user, type, note, items, null)), 201);
+    const header = type === 'IN' ? this.receiptHeader(user, c.body) : this.withdrawalHeader(user, c.body);
+    return ok(this.toTransaction(this.applyTransaction(user, type, note, items, null, header)), 201);
+  }
+
+  private receiptHeader(user: UserRow, body: Body): Partial<TransactionRow> {
+    const fy = body['fiscalYear'];
+    const project = body['projectName'];
+    return {
+      fiscalYear: typeof fy === 'number' ? fy : null,
+      projectName: typeof project === 'string' && project.trim() ? project.trim() : null,
+      requesterName: user.fullName,
+    };
+  }
+
+  /** Spec v2.2 D10/D11/Q2: same rules as the back-end. */
+  private withdrawalHeader(user: UserRow, body: Body): Partial<TransactionRow> {
+    const v = new Validator(body);
+    let requesterId: string | null = user.id;
+    let requesterName = user.fullName;
+    if (user.role !== 'USER') {
+      const picked = this.db.users.find((u) => u.id === body['requesterId'] && u.isActive);
+      const typed = typeof body['requesterName'] === 'string' ? body['requesterName'].trim() : '';
+      if (picked) ({ id: requesterId, fullName: requesterName } = picked);
+      else if (typed) [requesterId, requesterName] = [null, typed];
+      else v.errors.push({ field: 'requesterName', message: 'กรุณาระบุผู้เบิก' });
+    }
+    const dept = (field: string) => this.db.departments.find((d) => d.id === body[field] && d.isActive);
+    const requesting = dept('requestingDepartmentId');
+    const using = dept('usingDepartmentId');
+    if (!requesting || requesting.kind !== 'MAIN') v.errors.push({ field: 'requestingDepartmentId', message: 'กรุณาเลือกหน่วยงานที่เบิก (หน่วยงานหลัก)' });
+    if (!using) v.errors.push({ field: 'usingDepartmentId', message: 'กรุณาเลือกหน่วยงานที่ใช้' });
+    v.check();
+    const text = (k: string) => (typeof body[k] === 'string' && (body[k] as string).trim()) || null;
+    return {
+      requesterId,
+      requesterName,
+      requestingDepartmentId: requesting!.id,
+      usingDepartmentId: using!.id,
+      buildingId: this.db.buildings.some((b) => b.id === body['buildingId']) ? (body['buildingId'] as string) : null,
+      floor: text('floor'),
+      purpose: text('purpose'),
+    };
   }
 
   /** Validates stock, then applies all lines at once (the mock is synchronous, so this is atomic). */
@@ -437,6 +532,7 @@ export class MockApi {
     note: string | null,
     items: { materialId: string; quantity: number; unitPrice?: number }[],
     reversalOfId: string | null,
+    header: Partial<TransactionRow> = {},
   ): TransactionRow {
     const materials = items.map((i) => this.material(i.materialId));
     for (const [i, m] of materials.entries()) {
@@ -458,6 +554,16 @@ export class MockApi {
     const day = bangkokDate(now).replaceAll('-', '');
     this.db.counters[day] = (this.db.counters[day] ?? 0) + 1;
     const txn: TransactionRow = {
+      fiscalYear: null,
+      projectName: null,
+      requesterId: user.id,
+      requesterName: user.fullName,
+      requestingDepartmentId: null,
+      usingDepartmentId: null,
+      buildingId: null,
+      floor: null,
+      purpose: null,
+      ...header,
       id: crypto.randomUUID(),
       type,
       referenceNo: `TXN-${day}-${String(this.db.counters[day]).padStart(3, '0')}`,
@@ -479,7 +585,9 @@ export class MockApi {
   private visibleTransaction(c: Ctx, id: string): TransactionRow {
     const user = this.auth(c);
     const t = this.find(this.db.transactions, id, 'ไม่พบรายการ');
-    if (user.role === 'USER' && t.createdById !== user.id) throw new MockError(404, 'NOT_FOUND', 'ไม่พบรายการ');
+    if (user.role === 'USER' && t.createdById !== user.id && t.requesterId !== user.id) {
+      throw new MockError(404, 'NOT_FOUND', 'ไม่พบรายการ');
+    }
     return t;
   }
 
@@ -515,7 +623,10 @@ export class MockApi {
     const toMs = to ? bangkokDayStart(to) + DAY_MS : Infinity;
     const type = q.get('type');
     const materialId = q.get('materialId');
-    const createdById = user.role === 'USER' ? user.id : q.get('createdById');
+    const createdById = user.role === 'USER' ? null : q.get('createdById');
+    const requestingId = q.get('requestingDepartmentId');
+    const usingId = q.get('usingDepartmentId');
+    const serial = q.get('serial');
     const items = this.db.transactions
       .filter((t) => {
         const at = Date.parse(t.createdAt);
@@ -524,6 +635,10 @@ export class MockApi {
       .filter((t) => !type || t.type === type)
       .filter((t) => !materialId || t.items.some((i) => i.materialId === materialId))
       .filter((t) => !createdById || t.createdById === createdById)
+      .filter((t) => user.role !== 'USER' || t.createdById === user.id || t.requesterId === user.id)
+      .filter((t) => !requestingId || t.requestingDepartmentId === requestingId)
+      .filter((t) => !usingId || t.usingDepartmentId === usingId)
+      .filter(() => !serial) // the mock has no serial units
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     return paged(items, q, (t) => this.toTransaction(t));
   }
@@ -642,6 +757,31 @@ export class MockApi {
       .filter((m) => m.lastOutAt === null || (cutoff !== null && m.lastOutAt < cutoff))
       .sort((a, b) => (a.lastOutAt ?? '').localeCompare(b.lastOutAt ?? '') || b.currentQuantity - a.currentQuantity);
     return ok(data);
+  }
+
+  // ---- lookups ----
+
+  private saveLookup(c: Ctx, kind: string, id?: string): MockResponse {
+    this.auth(c, 'ADMIN');
+    const rows: LookupRow[] =
+      kind === 'departments' ? this.db.departments : kind === 'buildings' ? this.db.buildings : kind === 'storage-locations' ? this.db.storageLocations : [];
+    if (!['departments', 'buildings', 'storage-locations'].includes(kind)) throw new MockError(404, 'NOT_FOUND', 'ไม่พบ API ที่เรียก');
+    const v = new Validator(c.body);
+    const name = v.str('name', 'ชื่อ');
+    const departmentKind = kind === 'departments' ? v.oneOf('kind', 'ประเภทหน่วยงาน', ['MAIN', 'SUB'] as const) : undefined;
+    v.check();
+    if (rows.some((r) => r.id !== id && r.name.toLowerCase() === name!.toLowerCase())) {
+      throw new MockError(409, 'DUPLICATE_CODE', 'ชื่อนี้มีอยู่แล้ว', [{ field: 'name', message: 'ชื่อนี้มีอยู่แล้ว' }]);
+    }
+    const fields = { name: name!, isActive: c.body['isActive'] !== false, ...(departmentKind && { kind: departmentKind }) };
+    if (id) {
+      const row = this.find(rows, id, 'ไม่พบข้อมูล');
+      Object.assign(row, fields);
+      return ok(row);
+    }
+    const row = { id: crypto.randomUUID(), ...fields } as DepartmentRow;
+    rows.push(row);
+    return ok(row, 201);
   }
 
   // ---- helpers ----

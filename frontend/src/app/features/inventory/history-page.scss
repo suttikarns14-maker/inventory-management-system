@@ -30,6 +30,14 @@
   padding-left: 18px;
 }
 
+.serials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
 .nowrap {
   white-space: nowrap;
 }

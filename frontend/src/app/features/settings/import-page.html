@@ -1,0 +1,157 @@
+<div class="page-header"><h1>นำเข้าข้อมูลเริ่มต้นจาก Excel</h1></div>
+
+<section class="card">
+  <p>
+    ใช้ครั้งเดียวตอนเริ่มระบบ (ระบบต้องยังไม่มีวัสดุ) ไฟล์ต้องมีชีต <strong>"รายการ"</strong> และ
+    <strong>"Dropdowndata"</strong> ตามรูปแบบ IT_Inventory.xlsx · ของที่ซื้อเพิ่มภายหลังให้นำเข้าจากหน้า
+    <a routerLink="/inventory/transactions">รับเข้า</a>
+  </p>
+  <button mat-flat-button (click)="file.click()" [disabled]="busy()">
+    <mat-icon>upload_file</mat-icon> {{ fileName() || 'เลือกไฟล์ .xlsx' }}
+  </button>
+  <input #file type="file" accept=".xlsx" hidden (change)="choose($event)" />
+  @if (busy()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+</section>
+
+@if (report(); as r) {
+  <section class="card">
+    <h2>นำเข้าสำเร็จ</h2>
+    <div class="summary">
+      <div><strong>{{ r.materials }}</strong>วัสดุ (รายชิ้น {{ r.serialMaterials }})</div>
+      <div><strong>{{ r.units }}</strong>S/N</div>
+      <div><strong>{{ r.tempSerials }}</strong>S/N ชั่วคราว</div>
+      <div><strong>{{ r.inStock }}</strong>ชิ้นในคลัง</div>
+      <div><strong>{{ r.receipts }}</strong>รายการรับเข้า</div>
+      <div><strong>{{ r.withdrawals }}</strong>รายการเบิก</div>
+    </div>
+    <a mat-stroked-button routerLink="/materials">ดูรายการวัสดุ</a>
+    @if (r.tempSerials) {
+      <a mat-button routerLink="/units">แก้ S/N ชั่วคราว</a>
+    }
+  </section>
+}
+
+@if (preview(); as p) {
+  <section class="card">
+    <div class="summary">
+      <div><strong>{{ p.summary.rows }}</strong>ชิ้น</div>
+      <div><strong>{{ p.summary.materials }}</strong>วัสดุ (รายชิ้น {{ serialCount() }})</div>
+      <div><strong>{{ p.summary.inStockUnits }}</strong>ชิ้นในคลัง</div>
+      <div><strong>{{ p.summary.withdrawnUnits }}</strong>ชิ้นที่เบิกแล้ว</div>
+      <div><strong>{{ p.summary.receipts }}</strong>รายการรับเข้า</div>
+      <div><strong>{{ p.summary.withdrawals }}</strong>รายการเบิก</div>
+    </div>
+
+    <mat-tab-group animationDuration="0ms">
+      <mat-tab [label]="'วัสดุ (' + p.materials.length + ')'">
+        <div class="tab-body table-wrap">
+          <table class="simple">
+            <thead>
+              <tr>
+                <th>รหัส</th>
+                <th>วัสดุ</th>
+                <th>หมวดหมู่</th>
+                <th class="num">ชิ้น</th>
+                <th class="num">เบิกแล้ว</th>
+                <th class="num">มี S/N</th>
+                <th>วิธีติดตาม</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (m of p.materials; track m.key) {
+                <tr>
+                  <td>{{ m.code }}</td>
+                  <td>
+                    {{ m.name }}
+                    <div class="muted">{{ m.brand ?? '' }} {{ m.model ?? '' }}</div>
+                  </td>
+                  <td>{{ m.category }}</td>
+                  <td class="num">{{ m.units }}</td>
+                  <td class="num">{{ m.withdrawn }}</td>
+                  <td class="num" [class.temp-sn]="m.validSerials > 0 && m.validSerials < m.units">
+                    {{ m.validSerials }}
+                  </td>
+                  <td>
+                    <mat-select
+                      [value]="tracking()[m.key] ?? m.proposed"
+                      (selectionChange)="setTracking(m.key, $event.value)"
+                      [attr.aria-label]="'วิธีติดตาม ' + m.name"
+                    >
+                      <mat-option value="SERIAL">{{ labels.SERIAL }}</mat-option>
+                      <mat-option value="QUANTITY">{{ labels.QUANTITY }}</mat-option>
+                    </mat-select>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          <p class="muted">
+            "มี S/N" น้อยกว่าจำนวนชิ้น (สีส้ม) = ชิ้นที่ไม่มี S/N จะได้ S/N ชั่วคราว ...-TEMP-SN-NN ถ้าติดตามแบบรายชิ้น
+          </p>
+        </div>
+      </mat-tab>
+
+      <mat-tab [label]="'จับคู่หน่วยงาน/อาคาร (' + mappedCount() + ')'">
+        <div class="tab-body">
+          <p class="muted">ค่าในไฟล์ที่ไม่อยู่ในรายการ Dropdowndata: เลือกค่าที่ตรงกัน หรือปล่อยว่างเพื่อเก็บชื่อเดิมไว้ในหมายเหตุของรายการเบิก</p>
+          @for (g of unmatchedGroups(); track g.kind) {
+            <h3>{{ g.label }} ({{ g.values.length }})</h3>
+            @if (g.values.length) {
+              <table class="simple">
+                <tbody>
+                  @for (v of g.values; track v.value) {
+                    <tr>
+                      <td>{{ v.value }} <span class="muted">({{ v.rows }} แถว)</span></td>
+                      <td>
+                        <mat-select
+                          class="map-select"
+                          placeholder="ไม่จับคู่ (เก็บในหมายเหตุ)"
+                          [value]="mapping()[g.kind][v.value] ?? null"
+                          (selectionChange)="setMapping(g.kind, v, $event.value)"
+                        >
+                          <mat-option [value]="null">ไม่จับคู่ (เก็บในหมายเหตุ)</mat-option>
+                          @for (o of g.options; track o) {
+                            <mat-option [value]="o">{{ o }}</mat-option>
+                          }
+                        </mat-select>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            } @else {
+              <p class="muted">ตรงกับรายการทั้งหมด</p>
+            }
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab [label]="'ปัญหา (' + p.issues.length + ')'">
+        <div class="tab-body">
+          @for (i of p.issues; track $index) {
+            <div class="issue" [class.text-danger]="i.blocking">
+              <mat-icon>{{ i.blocking ? 'error' : 'warning' }}</mat-icon>
+              @if (i.row) {
+                แถว {{ i.row }}:
+              }
+              {{ i.message }}
+            </div>
+          } @empty {
+            <p class="muted">ไม่พบปัญหา</p>
+          }
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+
+    <div class="actions">
+      @if (blocking().length) {
+        <span class="text-danger">มีปัญหาที่ต้องแก้ในไฟล์ {{ blocking().length }} แถว</span>
+      }
+      <button mat-flat-button [disabled]="busy() || blocking().length > 0" (click)="commit()">
+        ยืนยันนำเข้าข้อมูล
+      </button>
+    </div>
+  </section>
+}

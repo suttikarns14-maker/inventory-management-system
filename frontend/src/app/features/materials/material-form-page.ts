@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, input, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,7 +8,14 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { Router, RouterLink } from '@angular/router';
-import { Material, MaterialInput, MaterialStatus } from '../../shared/models/material';
+import {
+  Material,
+  MaterialInput,
+  MaterialStatus,
+  TRACKING_LABELS,
+  TrackingType,
+} from '../../shared/models/material';
+import { active, LookupService } from '../../shared/services/lookup.service';
 import { CategoryService } from '../../shared/services/category.service';
 import { Notify } from '../../shared/services/notify';
 import { applyServerErrors } from '../../shared/utils/api-error';
@@ -55,6 +62,16 @@ import { MaterialService } from './material.service';
         </mat-form-field>
 
         <mat-form-field>
+          <mat-label>ยี่ห้อ</mat-label>
+          <input matInput formControlName="brand" />
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>รุ่น</mat-label>
+          <input matInput formControlName="model" />
+        </mat-form-field>
+
+        <mat-form-field>
           <mat-label>หมวดหมู่</mat-label>
           <mat-select formControlName="categoryId">
             @for (c of categories(); track c.id) {
@@ -80,8 +97,23 @@ import { MaterialService } from './material.service';
         </mat-form-field>
 
         <mat-form-field>
-          <mat-label>ตำแหน่งจัดเก็บ</mat-label>
-          <input matInput formControlName="location" placeholder="เช่น A-01-02" />
+          <mat-label>สถานที่เก็บของ</mat-label>
+          <mat-select formControlName="storageLocationId">
+            <mat-option [value]="''">ไม่ระบุ</mat-option>
+            @for (s of storageLocations(); track s.id) {
+              <mat-option [value]="s.id">{{ s.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>วิธีติดตาม</mat-label>
+          <mat-select formControlName="trackingType">
+            <mat-option value="QUANTITY">{{ trackingLabels.QUANTITY }}</mat-option>
+            <mat-option value="SERIAL">{{ trackingLabels.SERIAL }}</mat-option>
+          </mat-select>
+          <mat-hint>รายชิ้น = เก็บ S/N ของแต่ละชิ้น · เปลี่ยนไม่ได้หลังมีรายการรับ-เบิกแล้ว</mat-hint>
+          <mat-error>{{ form.controls.trackingType.getError('server') }}</mat-error>
         </mat-form-field>
 
         @if (id()) {
@@ -135,6 +167,9 @@ export class MaterialFormPage implements OnInit {
   private notify = inject(Notify);
 
   protected readonly categories = toSignal(inject(CategoryService).list(), { initialValue: [] });
+  private readonly lookups = toSignal(inject(LookupService).all());
+  protected readonly storageLocations = computed(() => active(this.lookups()?.storageLocations));
+  protected readonly trackingLabels = TRACKING_LABELS;
   protected readonly material = signal<Material | null>(null);
   protected readonly loading = signal(false);
   protected readonly saving = signal(false);
@@ -144,7 +179,10 @@ export class MaterialFormPage implements OnInit {
     categoryId: ['', Validators.required],
     unit: ['', [Validators.required, Validators.maxLength(30)]],
     minStock: [0, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
-    location: [''],
+    brand: [''],
+    model: [''],
+    storageLocationId: [''],
+    trackingType: ['QUANTITY' as TrackingType],
     status: ['ACTIVE' as MaterialStatus],
   });
 
@@ -155,7 +193,12 @@ export class MaterialFormPage implements OnInit {
     this.materials.get(id).subscribe({
       next: (m) => {
         this.material.set(m);
-        this.form.patchValue({ ...m, location: m.location ?? '' });
+        this.form.patchValue({
+          ...m,
+          brand: m.brand ?? '',
+          model: m.model ?? '',
+          storageLocationId: m.storageLocationId ?? '',
+        });
         this.loading.set(false);
       },
       error: (err: unknown) => {
@@ -178,7 +221,10 @@ export class MaterialFormPage implements OnInit {
       categoryId: v.categoryId,
       unit: v.unit.trim(),
       minStock: Number(v.minStock),
-      location: v.location.trim() || null,
+      brand: v.brand.trim() || null,
+      model: v.model.trim() || null,
+      trackingType: v.trackingType,
+      storageLocationId: v.storageLocationId || null,
       ...(id ? { status: v.status } : {}),
     };
     this.saving.set(true);

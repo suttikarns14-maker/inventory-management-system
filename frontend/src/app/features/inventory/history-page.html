@@ -49,6 +49,29 @@
       </mat-select>
     </mat-form-field>
 
+    <mat-form-field>
+      <mat-label>หน่วยงานที่เบิก</mat-label>
+      <mat-select
+        [value]="query().requestingDepartmentId ?? ''"
+        (selectionChange)="setFilter({ requestingDepartmentId: $event.value || undefined })"
+      >
+        <mat-option value="">ทั้งหมด</mat-option>
+        @for (d of mainDepartments(); track d.id) {
+          <mat-option [value]="d.id">{{ d.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>S/N</mat-label>
+      <input
+        matInput
+        [ngModel]="query().serial ?? ''"
+        (ngModelChange)="setSerial($event)"
+        placeholder="ค้นหาประวัติของ S/N"
+      />
+    </mat-form-field>
+
     <button mat-button (click)="clearFilters()">ล้างตัวกรอง</button>
   </div>
 
@@ -64,7 +87,7 @@
           <th>เลขอ้างอิง</th>
           <th>ประเภท</th>
           <th>รายการวัสดุ</th>
-          <th>ผู้ทำรายการ</th>
+          <th>ผู้เบิก / หน่วยงาน</th>
           <th>หมายเหตุ</th>
           @if (canReverse) {
             <th></th>
@@ -95,11 +118,48 @@
                   <li>
                     {{ i.material.name }}
                     <strong>{{ t.type === 'IN' ? '+' : '-' }}{{ i.quantity }}</strong> {{ i.material.unit }}
+                    @if (i.units.length) {
+                      <div class="serials">
+                        @for (u of i.units.slice(0, 5); track u.id) {
+                          <span [class.temp-sn]="u.isTempSerial">{{ u.serialNumber }}</span>
+                          @if (u.remark) {
+                            <span class="muted">({{ u.remark }})</span>
+                          }
+                        }
+                        @if (i.units.length > 5) {
+                          <span class="muted">และอีก {{ i.units.length - 5 }} S/N</span>
+                        }
+                      </div>
+                    }
                   </li>
                 }
               </ul>
             </td>
-            <td>{{ t.createdBy.fullName }}</td>
+            <td>
+              @if (t.type === 'OUT' && !t.reversalOf) {
+                {{ t.requesterName }}
+                <div class="muted">
+                  {{ t.requestingDepartment?.name ?? '' }}
+                  @if (t.usingDepartment && t.usingDepartment.id !== t.requestingDepartment?.id) {
+                    → {{ t.usingDepartment.name }}
+                  }
+                </div>
+                @if (t.building || t.floor || t.purpose) {
+                  <div class="muted">
+                    {{ t.building?.name ?? '' }} {{ t.floor ? 'ชั้น ' + t.floor : '' }}
+                    {{ t.purpose ? '· ' + t.purpose : '' }}
+                  </div>
+                }
+              } @else {
+                {{ t.createdBy.fullName }}
+                @if (t.fiscalYear || t.projectName) {
+                  <div class="muted">ปีงบ {{ t.fiscalYear ?? '-' }} {{ t.projectName ? '· ' + t.projectName : '' }}</div>
+                }
+              }
+              @if (t.createdBy.fullName !== t.requesterName && t.type === 'OUT') {
+                <div class="muted">บันทึกโดย {{ t.createdBy.fullName }}</div>
+              }
+            </td>
             <td class="note">{{ t.note ?? '-' }}</td>
             @if (canReverse) {
               <td>

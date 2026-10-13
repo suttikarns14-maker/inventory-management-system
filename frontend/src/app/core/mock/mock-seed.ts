@@ -78,7 +78,11 @@ const MATERIALS: MaterialSpec[] = [
   ['MNT-005', 'เทปพันเกลียว', 4, 'ม้วน', 10, 0.5, 15, 'normal'],
 ];
 
-const LOCATIONS = ['A-01-01', 'A-01-02', 'A-02-01', 'B-01-01', 'B-02-03', 'C-01-01', null];
+const STORAGE = ['ห้องเก็บของ IT พัชรกิติยาภา ชั้น 3 ห้อง 1 (ในฝ่าย)', 'ห้องเก็บของ IT พัชรกิติยาภา ชั้น 3 ห้อง 2 (นอกฝ่าย)', 'ห้องเก็บของ IT ทีปังกร B1'];
+const MAIN_DEPARTMENTS = ['ฝ่ายเทคโนโลยีสารสนเทศ', 'ฝ่ายการคลัง', 'ฝ่ายการพยาบาล', 'ภาควิชาเวชศาสตร์ฉุกเฉิน', 'สำนักงานผู้อำนวยการโรงพยาบาล'];
+const SUB_DEPARTMENTS = ['งานธุรการ', 'งานการเงิน', 'งานบริการผู้ป่วยนอก', 'งานบริการผู้ป่วยใน', 'งานเวชระเบียนและเวชสถิติ'];
+const BUILDINGS = ['อาคารพัชรกิติยาภา', 'อาคารทีปังกรรัศมีโชติ', 'อาคารเพชรรัตน์'];
+const PURPOSES = ['Notebook นศพ', 'ใช้ติดตั้งเครื่อง Thin Client', 'งานตรวจสุขภาพ', null];
 const SIM_DAYS = 180;
 
 export function createSeedData(now: Date = new Date()): MockData {
@@ -117,6 +121,15 @@ export function createSeedData(now: Date = new Date()): MockData {
     updatedAt: created,
   }));
 
+  const lookup = (names: string[], prefix: string) => names.map((name) => ({ id: id(prefix), name, isActive: true }));
+  const departments = [
+    ...lookup(MAIN_DEPARTMENTS, 'dep').map((d) => ({ ...d, kind: 'MAIN' as const })),
+    ...lookup(SUB_DEPARTMENTS, 'dep').map((d) => ({ ...d, kind: 'SUB' as const })),
+  ];
+  const buildings = lookup(BUILDINGS, 'bld');
+  const storageLocations = lookup(STORAGE, 'loc');
+  const fiscalYear = (d: Date) => d.getFullYear() + 543 + (d.getMonth() >= 9 ? 1 : 0);
+
   const specs = MATERIALS.map(([code, name, cat, unit, minStock, avgDaily, price, profile]) => ({
     row: {
       id: id('mat'),
@@ -126,7 +139,10 @@ export function createSeedData(now: Date = new Date()): MockData {
       unit,
       currentQuantity: 0,
       minStock,
-      location: pick(LOCATIONS),
+      brand: null,
+      model: null,
+      trackingType: 'QUANTITY',
+      storageLocationId: pick([...storageLocations.map((l) => l.id), null]),
       status: 'ACTIVE' as MaterialStatus,
       createdAt: created,
       updatedAt: created,
@@ -152,7 +168,17 @@ export function createSeedData(now: Date = new Date()): MockData {
       const m = specs.find((s) => s.row.id === item.materialId)!.row;
       m.currentQuantity += type === 'IN' ? item.quantity : -item.quantity;
     }
+    const out = type === 'OUT' && !reversalOfId;
     const txn: TransactionRow = {
+      fiscalYear: type === 'IN' && !reversalOfId ? fiscalYear(when) : null,
+      projectName: null,
+      requesterId: by.id,
+      requesterName: by.fullName,
+      requestingDepartmentId: out ? departments[0]!.id : null,
+      usingDepartmentId: out ? pick(departments).id : null,
+      buildingId: out ? pick(buildings).id : null,
+      floor: out ? pick(['3', '6', 'G', null]) : null,
+      purpose: out ? pick(PURPOSES) : null,
       id: id('txn'),
       type,
       referenceNo: `TXN-${day}-${String(counters[day]).padStart(3, '0')}`,
@@ -250,6 +276,9 @@ export function createSeedData(now: Date = new Date()): MockData {
     categories,
     materials: specs.map((s) => s.row),
     transactions,
+    departments,
+    buildings,
+    storageLocations,
     counters,
   };
 }

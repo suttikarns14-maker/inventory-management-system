@@ -5,13 +5,33 @@ export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
   OUT: 'เบิกจ่าย',
 };
 
+export interface Ref {
+  id: string;
+  name: string;
+}
+
+export interface TransactionUnitInfo {
+  id: string;
+  serialNumber: string;
+  isTempSerial: boolean;
+  remark: string | null;
+}
+
 export interface TransactionItem {
   id: string;
   materialId: string;
-  material: { id: string; code: string; name: string; unit: string };
+  material: {
+    id: string;
+    code: string;
+    name: string;
+    unit: string;
+    trackingType: 'QUANTITY' | 'SERIAL';
+  };
   quantity: number;
   /** Prisma Decimal is serialized as a string. */
   unitPrice: string | null;
+  /** Serial numbers moved by this line (SERIAL materials only). */
+  units: TransactionUnitInfo[];
 }
 
 export interface TransactionRef {
@@ -28,13 +48,45 @@ export interface StockTransaction {
   reversalOf: TransactionRef | null;
   reversedBy: TransactionRef | null;
   createdAt: string;
+  // IN
+  fiscalYear: number | null;
+  projectName: string | null;
+  // OUT (spec v2.2 §2.4); requesterName is always set
+  requesterName: string;
+  requester: { id: string; fullName: string } | null;
+  requestingDepartment: Ref | null;
+  usingDepartment: Ref | null;
+  building: Ref | null;
+  floor: string | null;
+  purpose: string | null;
   items: TransactionItem[];
+}
+
+/**
+ * One line per material: QUANTITY uses `quantity`; SERIAL + IN uses `serialNumbers`;
+ * SERIAL + OUT uses `units`.
+ */
+export interface TransactionItemInput {
+  materialId: string;
+  quantity?: number;
+  unitPrice?: number;
+  serialNumbers?: string[];
+  units?: { unitId: string; remark?: string | null }[];
 }
 
 export interface CreateTransactionInput {
   type: TransactionType;
   note?: string;
-  items: { materialId: string; quantity: number; unitPrice?: number }[];
+  fiscalYear?: number | null;
+  projectName?: string | null;
+  requesterId?: string | null;
+  requesterName?: string | null;
+  requestingDepartmentId?: string | null;
+  usingDepartmentId?: string | null;
+  buildingId?: string | null;
+  floor?: string | null;
+  purpose?: string | null;
+  items: TransactionItemInput[];
 }
 
 export interface HistoryQuery {
@@ -43,6 +95,9 @@ export interface HistoryQuery {
   type?: TransactionType;
   materialId?: string;
   createdById?: string;
+  requestingDepartmentId?: string;
+  usingDepartmentId?: string;
+  serial?: string;
   page?: number;
   limit?: number;
 }

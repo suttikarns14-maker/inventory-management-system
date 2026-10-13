@@ -16,7 +16,11 @@ function setup(as: 'admin' | 'staff' | 'user' | null = 'admin') {
       body,
     } satisfies MockRequest) as { status: number; body: any };
   const material = (code: string) => store.data.materials.find((m) => m.code === code)!;
-  return { store, call, material };
+  // Every withdrawal needs both departments and (for ADMIN/STAFF) a requester (spec v2.2 Q2, D10).
+  const main = store.data.departments.find((d) => d.kind === 'MAIN')!;
+  const sub = store.data.departments.find((d) => d.kind === 'SUB')!;
+  const header = { requestingDepartmentId: main.id, usingDepartmentId: sub.id, requesterName: 'ผู้เบิกทดสอบ' };
+  return { store, call, material, header, main, sub };
 }
 
 describe('MockApi', () => {
@@ -43,7 +47,7 @@ describe('MockApi', () => {
 
   it('validates new usernames and rejects duplicates in any letter case', () => {
     const { call } = setup('admin');
-    const base = { fullName: 'ทดสอบ', role: 'USER', password: 'P@ssw0rd' };
+    const base = { fullName: 'ทดสอบ', role: 'USER', password: 'test-pass-123' };
     expect(call('POST', '/users', { ...base, username: 'new.user_1' }).status).toBe(201);
     expect(call('POST', '/users', { ...base, username: 'New.User_1' }).status).toBe(409);
     const bad = call('POST', '/users', { ...base, username: 'มี เว้นวรรค' });
@@ -57,11 +61,12 @@ describe('MockApi', () => {
   });
 
   it('withdraws stock and returns a reference number', () => {
-    const { call, material } = setup('user');
+    const { call, material, header } = setup('user');
     const paper = material('OFF-001');
     const before = paper.currentQuantity;
     const res = call('POST', '/inventory/transactions', {
       type: 'OUT',
+      ...header,
       items: [{ materialId: paper.id, quantity: 1 }],
     });
     expect(res.status).toBe(201);
@@ -70,12 +75,13 @@ describe('MockApi', () => {
   });
 
   it('is all-or-nothing when one line exceeds stock', () => {
-    const { call, material } = setup('staff');
+    const { call, material, header } = setup('staff');
     const paper = material('OFF-001');
     const pens = material('OFF-002');
     const [p0, q0] = [paper.currentQuantity, pens.currentQuantity];
     const res = call('POST', '/inventory/transactions', {
       type: 'OUT',
+      ...header,
       items: [
         { materialId: paper.id, quantity: 1 },
         { materialId: pens.id, quantity: q0 + 1 },
@@ -102,6 +108,15 @@ describe('MockApi', () => {
     expect(dup.body.error.code).toBe('VALIDATION_ERROR');
   });
 
+  it('requires departments on withdrawals; the requesting one must be a main department', () => {
+    const { call, material, main, sub } = setup('staff');
+    const items = [{ materialId: material('OFF-001').id, quantity: 1 }];
+    const none = call('POST', '/inventory/transactions', { type: 'OUT', requesterName: 'x', items });
+    expect(none.body.error.details.map((d: any) => d.field).sort()).toEqual(['requestingDepartmentId', 'usingDepartmentId']);
+    const swapped = call('POST', '/inventory/transactions', { type: 'OUT', requesterName: 'x', requestingDepartmentId: sub.id, usingDepartmentId: main.id, items });
+    expect(swapped.body.error.details[0].field).toBe('requestingDepartmentId');
+  });
+
   it('enforces role permissions', () => {
     const { call, material } = setup('user');
     const id = material('OFF-001').id;
@@ -119,11 +134,12 @@ describe('MockApi', () => {
   });
 
   it('reverses a transaction exactly once and restores stock', () => {
-    const { call, material } = setup('admin');
+    const { call, material, header } = setup('admin');
     const paper = material('OFF-001');
     const before = paper.currentQuantity;
     const txn = call('POST', '/inventory/transactions', {
       type: 'OUT',
+      ...header,
       items: [{ materialId: paper.id, quantity: 2 }],
     }).body.data;
     const reversal = call('POST', `/inventory/transactions/${txn.id}/reverse`, { note: 'ทดสอบ' });

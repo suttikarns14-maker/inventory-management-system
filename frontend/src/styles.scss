@@ -172,3 +172,17 @@ body {
   --mat-snack-bar-supporting-text-color: #fff;
   --mat-snack-bar-button-color: #fff;
 }
+
+.name-link {
+  color: var(--mat-sys-primary);
+  text-decoration: none;
+  font-weight: 500;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.temp-sn {
+  color: var(--app-warn);
+}

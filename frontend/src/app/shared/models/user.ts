@@ -19,6 +19,13 @@ export interface User {
   updatedAt: string;
 }
 
+/** For the requester picker (GET /users/options, ADMIN and STAFF). */
+export interface UserOption {
+  id: string;
+  username: string;
+  fullName: string;
+}
+
 export interface CreateUserInput {
   username: string;
   fullName: string;

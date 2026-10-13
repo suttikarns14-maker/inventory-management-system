@@ -1,5 +1,6 @@
 import { Role } from '../../shared/models/user';
-import { MaterialStatus } from '../../shared/models/material';
+import { MaterialStatus, TrackingType } from '../../shared/models/material';
+import { DepartmentKind } from '../../shared/models/lookup';
 import { TransactionType } from '../../shared/models/transaction';
 
 // Row shapes mirror the Prisma schema (spec §3). They are what a real DB would hold,
@@ -32,7 +33,10 @@ export interface MaterialRow {
   unit: string;
   currentQuantity: number;
   minStock: number;
-  location: string | null;
+  brand: string | null;
+  model: string | null;
+  trackingType: TrackingType;
+  storageLocationId: string | null;
   status: MaterialStatus;
   createdAt: string;
   updatedAt: string;
@@ -54,6 +58,26 @@ export interface TransactionRow {
   reversalOfId: string | null;
   createdAt: string;
   items: TransactionItemRow[];
+  // spec v2.2 §2.4
+  fiscalYear: number | null;
+  projectName: string | null;
+  requesterId: string | null;
+  requesterName: string;
+  requestingDepartmentId: string | null;
+  usingDepartmentId: string | null;
+  buildingId: string | null;
+  floor: string | null;
+  purpose: string | null;
+}
+
+export interface LookupRow {
+  id: string;
+  name: string;
+  isActive: boolean;
+}
+
+export interface DepartmentRow extends LookupRow {
+  kind: DepartmentKind;
 }
 
 export interface MockData {
@@ -61,6 +85,9 @@ export interface MockData {
   categories: CategoryRow[];
   materials: MaterialRow[];
   transactions: TransactionRow[];
+  departments: DepartmentRow[];
+  buildings: LookupRow[];
+  storageLocations: LookupRow[];
   /** YYYYMMDD -> last sequence number used (ReferenceCounter). */
   counters: Record<string, number>;
 }
@@ -79,7 +106,7 @@ export class MemoryStore implements MockStore {
 }
 
 // Bump the version whenever the row shape changes so old browser data is replaced by a fresh seed.
-const DATA_KEY = 'ims-mock-data-v2'; // v2: email -> username
+const DATA_KEY = 'ims-mock-data-v3'; // v2: email -> username; v3: lookups + v2.2 fields
 const SESSION_KEY = 'ims-mock-session';
 
 export class LocalStorageStore implements MockStore {
