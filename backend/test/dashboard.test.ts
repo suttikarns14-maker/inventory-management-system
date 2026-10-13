@@ -1,13 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/lib/prisma.js';
-import { loginAs, seedBasics } from './helpers.js';
+import { loginAs, out, seedBasics } from './helpers.js';
 
 let fx: Awaited<ReturnType<typeof seedBasics>>;
 beforeEach(async () => {
   fx = await seedBasics();
 });
 
-const out = (materialId: string, quantity: number) => ({ type: 'OUT', items: [{ materialId, quantity }] });
 
 describe('dashboard (spec §6)', () => {
   it('ranks withdrawals, ignores reversed ones, and lists never-used materials', async () => {

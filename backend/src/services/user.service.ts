@@ -46,6 +46,14 @@ export async function listUsers(q: z.infer<typeof listUsersSchema>): Promise<Pag
   return { items, total };
 }
 
+/** Active users for the "requester" picker; available to STAFF too (spec v2.2 D10). */
+export const userOptions = () =>
+  prisma.user.findMany({
+    where: { isActive: true },
+    select: { id: true, username: true, fullName: true },
+    orderBy: { fullName: 'asc' },
+  });
+
 export async function createUser(input: z.infer<typeof createUserSchema>): Promise<SessionUser> {
   if (await findByUsername(input.username)) throw duplicate('username', 'ชื่อผู้ใช้นี้ถูกใช้แล้ว');
   return prisma.user.create({

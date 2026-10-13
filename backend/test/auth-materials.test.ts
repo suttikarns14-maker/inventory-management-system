@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/lib/prisma.js';
-import { app, createUser, loginAs, PASSWORD, seedBasics, stockOf } from './helpers.js';
+import { app, createUser, depts, loginAs, PASSWORD, seedBasics, stockOf } from './helpers.js';
 
 let fx: Awaited<ReturnType<typeof seedBasics>>;
 beforeEach(async () => {
@@ -49,7 +49,7 @@ describe('roles (spec §1)', () => {
     const agent = await loginAs('user');
     const item = { materialId: fx.paper.id, quantity: 1 };
     expect((await agent.post('/api/v1/inventory/transactions').send({ type: 'IN', items: [item] })).status).toBe(403);
-    expect((await agent.post('/api/v1/inventory/transactions').send({ type: 'OUT', items: [item] })).status).toBe(201);
+    expect((await agent.post('/api/v1/inventory/transactions').send({ type: 'OUT', ...depts, items: [item] })).status).toBe(201);
     expect((await agent.get('/api/v1/dashboard/summary')).status).toBe(403);
     expect((await agent.post('/api/v1/materials').send({})).status).toBe(403);
     expect((await agent.get('/api/v1/users')).status).toBe(403);
