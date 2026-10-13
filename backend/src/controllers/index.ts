@@ -7,9 +7,13 @@ import {
 } from '../middlewares/auth.middleware.js';
 import * as categories from '../services/category.service.js';
 import * as dashboard from '../services/dashboard.service.js';
+import * as importer from '../services/import.service.js';
+import * as lookups from '../services/lookup.service.js';
+import * as units from '../services/unit.service.js';
 import * as materials from '../services/material.service.js';
 import * as transactions from '../services/transaction.service.js';
 import * as users from '../services/user.service.js';
+import { AppError } from '../utils/app-error.js';
 import { ok, sendPage } from '../utils/http.js';
 
 // Controllers only parse input (Zod DTOs; a ZodError becomes VALIDATION_ERROR in the error
@@ -36,6 +40,9 @@ export const user = {
   async list(req: Request, res: Response) {
     const q = dto.listUsersSchema.parse(req.query);
     sendPage(res, await users.listUsers(q), q);
+  },
+  async options(_req: Request, res: Response) {
+    ok(res, await users.userOptions());
   },
   async create(req: Request, res: Response) {
     ok(res, await users.createUser(dto.createUserSchema.parse(req.body)), 201);
@@ -92,6 +99,73 @@ export const inventory = {
   async history(req: Request, res: Response) {
     const q = dto.historySchema.parse(req.query);
     sendPage(res, await transactions.history(currentUser(req), q), q);
+  },
+};
+
+export const unit = {
+  async listForMaterial(req: Request, res: Response) {
+    const q = dto.listUnitsSchema.parse(req.query);
+    sendPage(res, await units.listUnits(q, id(req)), q);
+  },
+  async search(req: Request, res: Response) {
+    const q = dto.listUnitsSchema.parse(req.query);
+    sendPage(res, await units.listUnits(q), q);
+  },
+  async update(req: Request, res: Response) {
+    ok(res, await units.updateSerial(id(req), dto.updateUnitSchema.parse(req.body).serialNumber));
+  },
+};
+
+export const lookup = {
+  async all(_req: Request, res: Response) {
+    ok(res, await lookups.getLookups());
+  },
+  async createDepartment(req: Request, res: Response) {
+    ok(res, await lookups.createDepartment(dto.departmentSchema.parse(req.body)), 201);
+  },
+  async updateDepartment(req: Request, res: Response) {
+    ok(res, await lookups.updateDepartment(id(req), dto.departmentSchema.parse(req.body)));
+  },
+  async createBuilding(req: Request, res: Response) {
+    ok(res, await lookups.createBuilding(dto.lookupSchema.parse(req.body)), 201);
+  },
+  async updateBuilding(req: Request, res: Response) {
+    ok(res, await lookups.updateBuilding(id(req), dto.lookupSchema.parse(req.body)));
+  },
+  async createStorageLocation(req: Request, res: Response) {
+    ok(res, await lookups.createStorageLocation(dto.lookupSchema.parse(req.body)), 201);
+  },
+  async updateStorageLocation(req: Request, res: Response) {
+    ok(res, await lookups.updateStorageLocation(id(req), dto.lookupSchema.parse(req.body)));
+  },
+};
+
+/** The upload arrives as the raw request body (express.raw on these routes). */
+function uploadedFile(req: Request): Buffer {
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'กรุณาเลือกไฟล์ Excel');
+  }
+  return req.body;
+}
+
+export const imports = {
+  async previewInitial(req: Request, res: Response) {
+    ok(res, await importer.previewInitialImport(currentUser(req), uploadedFile(req)));
+  },
+  async commitInitial(req: Request, res: Response) {
+    ok(res, await importer.commitInitialImport(currentUser(req), dto.commitInitialImportSchema.parse(req.body)), 201);
+  },
+  async previewReceipt(req: Request, res: Response) {
+    ok(res, await importer.previewReceiptImport(currentUser(req), uploadedFile(req)));
+  },
+  async commitReceipt(req: Request, res: Response) {
+    ok(res, await importer.commitReceiptImport(currentUser(req), dto.commitReceiptImportSchema.parse(req.body)), 201);
+  },
+  async template(_req: Request, res: Response) {
+    res
+      .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .attachment('receipt-template.xlsx')
+      .send(await importer.receiptTemplate());
   },
 };
 

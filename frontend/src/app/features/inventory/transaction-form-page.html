@@ -1,5 +1,11 @@
 <div class="page-header">
-  <h1>{{ canReceive ? 'รับเข้า / เบิกจ่าย' : 'เบิกวัสดุ' }}</h1>
+  <h1>{{ isStaff ? 'รับเข้า / เบิกจ่าย' : 'เบิกวัสดุ' }}</h1>
+  @if (isAdmin && type() === 'IN') {
+    <button mat-stroked-button (click)="openImport()">
+      <mat-icon>upload_file</mat-icon>
+      นำเข้าจากไฟล์
+    </button>
+  }
   <a mat-button routerLink="/inventory/history">
     <mat-icon>history</mat-icon>
     ดูประวัติ
@@ -7,7 +13,7 @@
 </div>
 
 <form class="card" [formGroup]="form" (ngSubmit)="submit()">
-  @if (canReceive) {
+  @if (isStaff) {
     <mat-button-toggle-group
       class="type-toggle"
       formControlName="type"
@@ -25,6 +31,111 @@
     </mat-button-toggle-group>
   }
 
+  <!-- Header: who / where (OUT) or which purchase (IN) -->
+  <div class="form-grid header">
+    @if (type() === 'OUT') {
+      @if (isStaff) {
+        <mat-form-field>
+          <mat-label>ผู้เบิก</mat-label>
+          <input
+            matInput
+            formControlName="requester"
+            [matAutocomplete]="requesterAuto"
+            placeholder="เลือกผู้ใช้ หรือพิมพ์ชื่อ"
+          />
+          <mat-autocomplete #requesterAuto="matAutocomplete" [displayWith]="displayUser">
+            @for (u of requesterOptions(); track u.id) {
+              <mat-option [value]="u">{{ u.fullName }} <span class="muted">({{ u.username }})</span></mat-option>
+            }
+          </mat-autocomplete>
+          <mat-hint>ไม่มีในรายการก็พิมพ์ชื่อได้เลย</mat-hint>
+          <mat-error>กรุณาระบุผู้เบิก</mat-error>
+        </mat-form-field>
+      } @else {
+        <div class="requester-self">
+          <span class="muted">ผู้เบิก</span>
+          {{ me()?.fullName }}
+        </div>
+      }
+
+      <mat-form-field>
+        <mat-label>หน่วยงานที่เบิก (หน่วยงานหลัก)</mat-label>
+        <input
+          matInput
+          formControlName="requestingDepartmentId"
+          [matAutocomplete]="requestingAuto"
+          placeholder="พิมพ์เพื่อค้นหา"
+        />
+        <mat-autocomplete #requestingAuto="matAutocomplete" [displayWith]="displayName" requireSelection>
+          @for (d of requestingOptions(); track d.id) {
+            <mat-option [value]="d">{{ d.name }}</mat-option>
+          }
+        </mat-autocomplete>
+        <mat-error>
+          {{ form.controls.requestingDepartmentId.getError('server') ?? 'กรุณาเลือกหน่วยงานที่เบิกจากรายการ' }}
+        </mat-error>
+      </mat-form-field>
+
+      <mat-form-field>
+        <mat-label>หน่วยงานที่ใช้</mat-label>
+        <input
+          matInput
+          formControlName="usingDepartmentId"
+          [matAutocomplete]="usingAuto"
+          placeholder="หน่วยงานหลักหรือย่อย"
+        />
+        <mat-autocomplete #usingAuto="matAutocomplete" [displayWith]="displayName" requireSelection>
+          @for (d of usingOptions(); track d.id) {
+            <mat-option [value]="d">
+              {{ d.name }}
+              @if (d.kind === 'MAIN') {
+                <span class="muted">(หลัก)</span>
+              }
+            </mat-option>
+          }
+        </mat-autocomplete>
+        <mat-error>
+          {{ form.controls.usingDepartmentId.getError('server') ?? 'กรุณาเลือกหน่วยงานที่ใช้จากรายการ' }}
+        </mat-error>
+      </mat-form-field>
+
+      <mat-form-field>
+        <mat-label>อาคาร</mat-label>
+        <mat-select formControlName="buildingId">
+          <mat-option value="">ไม่ระบุ</mat-option>
+          @for (b of buildings(); track b.id) {
+            <mat-option [value]="b.id">{{ b.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field>
+        <mat-label>ชั้น</mat-label>
+        <mat-select formControlName="floor">
+          <mat-option value="">ไม่ระบุ</mat-option>
+          @for (f of floors(); track f) {
+            <mat-option [value]="f">{{ f }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field>
+        <mat-label>ระบบงานที่ใช้</mat-label>
+        <input matInput formControlName="purpose" placeholder="เช่น Notebook นศพ" />
+      </mat-form-field>
+    } @else {
+      <mat-form-field>
+        <mat-label>ปีงบประมาณ (พ.ศ.)</mat-label>
+        <input matInput type="number" formControlName="fiscalYear" />
+        <mat-error>ปีงบประมาณต้องเป็นปี พ.ศ.</mat-error>
+      </mat-form-field>
+      <mat-form-field class="span-2">
+        <mat-label>ชื่อโครงการ (TOR)</mat-label>
+        <input matInput formControlName="projectName" placeholder="เช่น วัสดุปลายเปิดปี 2569" />
+      </mat-form-field>
+    }
+  </div>
+
   <mat-form-field class="full">
     <mat-label>ค้นหาวัสดุเพื่อเพิ่มในรายการ</mat-label>
     <mat-icon matPrefix>search</mat-icon>
@@ -32,7 +143,7 @@
       matInput
       [formControl]="picker"
       [matAutocomplete]="auto"
-      placeholder="พิมพ์รหัสหรือชื่อวัสดุ"
+      placeholder="พิมพ์รหัส ชื่อ ยี่ห้อ หรือรุ่น"
     />
     <mat-autocomplete
       #auto="matAutocomplete"
@@ -42,6 +153,9 @@
       @for (m of options(); track m.id) {
         <mat-option [value]="m">
           {{ m.code }} · {{ m.name }}
+          @if (m.brand) {
+            <span class="muted">{{ m.brand }}</span>
+          }
           <span class="muted">(คงเหลือ {{ m.currentQuantity }} {{ m.unit }})</span>
         </mat-option>
       } @empty {
@@ -51,78 +165,144 @@
   </mat-form-field>
 
   @if (items.length) {
-    <div class="table-wrap" formArrayName="items">
-      <table class="lines">
-        <thead>
-          <tr>
-            <th>วัสดุ</th>
-            <th class="num">คงเหลือ</th>
-            <th>จำนวน{{ typeLabel() }}</th>
-            @if (type() === 'IN') {
-              <th>ราคาต่อหน่วย (บาท)</th>
-            }
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (line of items.controls; track line; let i = $index) {
-            @let m = line.controls.material.value;
-            <tr [formGroupName]="i">
-              <td>
-                <div>{{ m.name }}</div>
-                <div class="muted">{{ m.code }}</div>
-              </td>
-              <td class="num">{{ m.currentQuantity }} {{ m.unit }}</td>
-              <td>
-                <mat-form-field class="qty">
-                  <input
-                    matInput
-                    type="number"
-                    min="1"
-                    step="1"
-                    formControlName="quantity"
-                    [id]="'qty-' + m.id"
-                    [errorStateMatcher]="errorMatcher"
-                    [attr.aria-label]="'จำนวน ' + m.name"
-                  />
-                  <span matTextSuffix>{{ m.unit }}</span>
-                  @let q = line.controls.quantity;
-                  @if (q.hasError('exceedsStock')) {
-                    <mat-error>เกินยอดคงเหลือ (มี {{ q.getError('exceedsStock') }} {{ m.unit }})</mat-error>
-                  } @else if (q.hasError('server')) {
-                    <mat-error>{{ q.getError('server') }}</mat-error>
-                  } @else if (q.hasError('positiveInteger')) {
-                    <mat-error>ต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป</mat-error>
-                  } @else {
-                    <mat-error>กรุณากรอกจำนวน</mat-error>
-                  }
-                </mat-form-field>
-              </td>
-              @if (type() === 'IN') {
-                <td>
-                  <mat-form-field class="qty">
-                    <input
-                      matInput
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      formControlName="unitPrice"
-                      placeholder="ไม่บังคับ"
-                      [attr.aria-label]="'ราคาต่อหน่วย ' + m.name"
-                    />
-                    <mat-error>ราคาต้องไม่ติดลบ</mat-error>
-                  </mat-form-field>
-                </td>
+    <div formArrayName="items" class="lines">
+      @for (line of items.controls; track line; let i = $index) {
+        @let m = line.controls.material.value;
+        <div class="line" [formGroupName]="i">
+          <div class="line-head">
+            <div>
+              <strong>{{ m.name }}</strong>
+              <span class="muted"> {{ m.code }} · คงเหลือ {{ m.currentQuantity }} {{ m.unit }}</span>
+              @if (m.trackingType === 'SERIAL') {
+                <span class="badge badge-neutral">รายชิ้น (S/N)</span>
               }
-              <td>
-                <button mat-icon-button type="button" (click)="remove(i)" aria-label="ลบรายการ">
-                  <mat-icon>delete_outline</mat-icon>
-                </button>
-              </td>
-            </tr>
+            </div>
+            <button mat-icon-button type="button" (click)="remove(i)" aria-label="ลบรายการ">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          </div>
+
+          @if (m.trackingType === 'QUANTITY') {
+            <div class="line-fields">
+              <mat-form-field class="qty">
+                <mat-label>จำนวน{{ typeLabel() }}</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  min="1"
+                  step="1"
+                  formControlName="quantity"
+                  [id]="'line-' + m.id"
+                  [errorStateMatcher]="errorMatcher"
+                />
+                <span matTextSuffix>{{ m.unit }}</span>
+                @let q = line.controls.quantity;
+                @if (q.hasError('exceedsStock')) {
+                  <mat-error>เกินยอดคงเหลือ (มี {{ q.getError('exceedsStock') }} {{ m.unit }})</mat-error>
+                } @else if (q.hasError('server')) {
+                  <mat-error>{{ q.getError('server') }}</mat-error>
+                } @else if (q.hasError('positiveInteger')) {
+                  <mat-error>ต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป</mat-error>
+                } @else {
+                  <mat-error>กรุณากรอกจำนวน</mat-error>
+                }
+              </mat-form-field>
+              @if (type() === 'IN') {
+                <mat-form-field class="qty">
+                  <mat-label>ราคาต่อหน่วย (บาท)</mat-label>
+                  <input matInput type="number" min="0" step="0.01" formControlName="unitPrice" placeholder="ไม่บังคับ" />
+                </mat-form-field>
+              }
+            </div>
+          } @else if (type() === 'IN') {
+            <div class="line-fields">
+              <mat-form-field class="serials">
+                <mat-label>S/N ({{ serialCount(line) }} ชิ้น)</mat-label>
+                <textarea
+                  matInput
+                  rows="4"
+                  formControlName="serialNumbers"
+                  [id]="'line-' + m.id"
+                  [errorStateMatcher]="errorMatcher"
+                  placeholder="1 บรรทัดต่อ 1 S/N · วางจาก Excel หรือยิงบาร์โค้ดได้"
+                ></textarea>
+                @let sn = line.controls.serialNumbers;
+                @if (sn.hasError('duplicate')) {
+                  <mat-error>S/N ซ้ำในรายการ: {{ sn.getError('duplicate') }}</mat-error>
+                } @else if (sn.hasError('invalid')) {
+                  <mat-error>S/N ต้องไม่มีช่องว่าง: {{ sn.getError('invalid') }}</mat-error>
+                } @else if (sn.hasError('server')) {
+                  <mat-error>{{ sn.getError('server') }}</mat-error>
+                } @else {
+                  <mat-error>กรุณากรอก S/N</mat-error>
+                }
+              </mat-form-field>
+              <mat-form-field class="qty">
+                <mat-label>ราคาต่อหน่วย (บาท)</mat-label>
+                <input matInput type="number" min="0" step="0.01" formControlName="unitPrice" placeholder="ไม่บังคับ" />
+              </mat-form-field>
+            </div>
+          } @else {
+            <div class="line-fields">
+              <mat-form-field class="unit-search">
+                <mat-label>เลือก S/N ที่เบิก ({{ line.controls.units.length }} ชิ้น)</mat-label>
+                <mat-icon matPrefix>qr_code_scanner</mat-icon>
+                <input
+                  matInput
+                  formControlName="unitSearch"
+                  [id]="'line-' + m.id"
+                  [matAutocomplete]="unitAuto"
+                  (focus)="searchUnits(line)"
+                  (input)="searchUnits(line)"
+                  placeholder="พิมพ์หรือยิงบาร์โค้ด S/N"
+                />
+                <mat-autocomplete
+                  #unitAuto="matAutocomplete"
+                  [displayWith]="displayUnit"
+                  (optionSelected)="pickUnit(line, $event.option.value)"
+                >
+                  @for (u of unitOptions(); track u.id) {
+                    <mat-option [value]="u">
+                      <span [class.temp-sn]="u.isTempSerial">{{ u.serialNumber }}</span>
+                      <span class="muted"> {{ u.storageLocation?.name ?? '' }}</span>
+                    </mat-option>
+                  } @empty {
+                    <mat-option disabled>ไม่พบ S/N ที่อยู่ในคลัง</mat-option>
+                  }
+                </mat-autocomplete>
+                @if (line.controls.units.touched && line.controls.units.invalid) {
+                  <mat-hint class="text-danger">กรุณาเลือก S/N อย่างน้อย 1 ชิ้น</mat-hint>
+                }
+              </mat-form-field>
+              <div class="auto-add">
+                <mat-form-field class="count">
+                  <mat-label>จำนวน</mat-label>
+                  <input matInput type="number" min="1" formControlName="autoCount" />
+                </mat-form-field>
+                <button mat-stroked-button type="button" (click)="addFirstUnits(line)">เพิ่ม N ชิ้นแรกในคลัง</button>
+              </div>
+            </div>
+            @if (line.controls.units.length) {
+              <div formArrayName="units" class="chosen">
+                @for (u of line.controls.units.controls; track u; let j = $index) {
+                  <div class="chosen-row" [formGroupName]="j">
+                    <span class="sn" [class.temp-sn]="u.controls.unit.value.isTempSerial">
+                      {{ u.controls.unit.value.serialNumber }}
+                    </span>
+                    <mat-form-field class="remark">
+                      <mat-label>หมายเหตุ เช่น ติดตั้งกับเครื่อง</mat-label>
+                      <input matInput formControlName="remark" />
+                    </mat-form-field>
+                    <button mat-icon-button type="button" (click)="removeUnit(line, j)" aria-label="เอาออก">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                }
+              </div>
+            }
           }
-        </tbody>
-      </table>
+        </div>
+      }
     </div>
   } @else {
     <p class="empty">ยังไม่มีรายการ ค้นหาวัสดุด้านบนเพื่อเพิ่ม</p>
@@ -130,16 +310,12 @@
 
   <mat-form-field class="full note">
     <mat-label>หมายเหตุ</mat-label>
-    <textarea matInput rows="2" formControlName="note" placeholder="เช่น เบิกใช้งานแผนกบัญชี"></textarea>
+    <textarea matInput rows="2" formControlName="note"></textarea>
   </mat-form-field>
 
   <div class="actions">
     <span class="muted count">{{ items.length }} รายการ</span>
-    <button
-      mat-flat-button
-      type="submit"
-      [disabled]="saving() || items.length === 0 || form.invalid"
-    >
+    <button mat-flat-button type="submit" [disabled]="saving() || items.length === 0 || form.invalid">
       {{ saving() ? 'กำลังบันทึก...' : 'ยืนยันรายการ' + typeLabel() }}
     </button>
   </div>

@@ -8,3 +8,6 @@ coverage/
 *.log
 .DS_Store
 Thumbs.db
+
+# Real organisation data (names, serial numbers): never commit
+docs/*.xlsx

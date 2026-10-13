@@ -1,13 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/lib/prisma.js';
-import { loginAs, seedBasics, stockOf } from './helpers.js';
+import { depts, loginAs, out, seedBasics, stockOf } from './helpers.js';
 
 let fx: Awaited<ReturnType<typeof seedBasics>>;
 beforeEach(async () => {
   fx = await seedBasics();
 });
 
-const out = (materialId: string, quantity: number) => ({ type: 'OUT', items: [{ materialId, quantity }] });
 
 describe('stock transactions (spec §5)', () => {
   it('withdraws, returns the API contract shape and a daily reference number', async () => {
@@ -38,6 +37,7 @@ describe('stock transactions (spec §5)', () => {
     const agent = await loginAs('staff');
     const res = await agent.post('/api/v1/inventory/transactions').send({
       type: 'OUT',
+      ...depts,
       items: [
         { materialId: fx.paper.id, quantity: 1 },
         { materialId: fx.pens.id, quantity: 4 },

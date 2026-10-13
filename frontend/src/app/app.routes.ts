@@ -51,6 +51,18 @@ export const routes: Routes = [
           import('./features/materials/material-form-page').then((m) => m.MaterialFormPage),
       },
       {
+        path: 'materials/:id',
+        title: 'รายละเอียดวัสดุ',
+        loadComponent: () =>
+          import('./features/materials/material-detail-page').then((m) => m.MaterialDetailPage),
+      },
+      {
+        path: 'units',
+        title: 'ค้นหา Serial Number',
+        data: { roles: ['ADMIN', 'STAFF'] },
+        loadComponent: () => import('./features/inventory/units-page').then((m) => m.UnitsPage),
+      },
+      {
         path: 'inventory/transactions',
         title: 'รับเข้า / เบิกจ่าย',
         loadComponent: () =>
@@ -74,6 +86,18 @@ export const routes: Routes = [
         data: { roles: ['ADMIN'] },
         loadComponent: () =>
           import('./features/settings/categories-page').then((m) => m.CategoriesPage),
+      },
+      {
+        path: 'settings/lookups',
+        title: 'ข้อมูลอ้างอิง',
+        data: { roles: ['ADMIN'] },
+        loadComponent: () => import('./features/settings/lookups-page').then((m) => m.LookupsPage),
+      },
+      {
+        path: 'settings/import',
+        title: 'นำเข้าข้อมูล',
+        data: { roles: ['ADMIN'] },
+        loadComponent: () => import('./features/settings/import-page').then((m) => m.ImportPage),
       },
       { path: '', pathMatch: 'full', redirectTo: () => homeFor(inject(AuthService).role()) },
     ],

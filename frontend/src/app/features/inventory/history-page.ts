@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -20,6 +20,7 @@ import {
   StockTransaction,
   TRANSACTION_TYPE_LABELS,
 } from '../../shared/models/transaction';
+import { LookupService } from '../../shared/services/lookup.service';
 import { Notify } from '../../shared/services/notify';
 import { MaterialService } from '../materials/material.service';
 import { InventoryService } from './inventory.service';
@@ -58,7 +59,13 @@ export class HistoryPage {
     { initialValue: null },
   );
 
+  private readonly lookups = toSignal(inject(LookupService).all().pipe(catchError(() => of(null))));
+  protected readonly mainDepartments = computed(() =>
+    (this.lookups()?.departments ?? []).filter((d) => d.kind === 'MAIN'),
+  );
+
   protected readonly query = signal<HistoryQuery>({ page: 1, limit: 20 });
+  private serialTimer?: ReturnType<typeof setTimeout>;
   protected readonly result = signal<Page<StockTransaction> | null>(null);
   protected readonly loading = signal(false);
 
@@ -69,6 +76,11 @@ export class HistoryPage {
   protected setFilter(changes: Partial<HistoryQuery>): void {
     this.query.update((q) => ({ ...q, ...changes, page: 1 }));
     this.load();
+  }
+
+  protected setSerial(value: string): void {
+    clearTimeout(this.serialTimer);
+    this.serialTimer = setTimeout(() => this.setFilter({ serial: value.trim() || undefined }), 300);
   }
 
   protected clearFilters(): void {

@@ -3,16 +3,9 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 
-// Safe to run more than once: it only creates what is missing and never changes existing data
-// (an existing admin keeps the password they already changed).
-
-const CATEGORIES: [string, string][] = [
-  ['วัสดุสำนักงาน', 'กระดาษ เครื่องเขียน และของใช้ในสำนักงาน'],
-  ['อุปกรณ์ไฟฟ้า', 'หลอดไฟ สายไฟ และอุปกรณ์ไฟฟ้าทั่วไป'],
-  ['วัสดุทำความสะอาด', 'น้ำยาและอุปกรณ์ทำความสะอาด'],
-  ['อุปกรณ์คอมพิวเตอร์', 'อุปกรณ์ต่อพ่วงและวัสดุสิ้นเปลืองคอมพิวเตอร์'],
-  ['วัสดุซ่อมบำรุง', 'อะไหล่และวัสดุสำหรับงานซ่อมบำรุงอาคาร'],
-];
+// Creates the first admin only. Categories, departments, buildings and storage locations come
+// from the Excel import (spec v2.2 §5). Safe to run more than once: an existing admin is left
+// unchanged (and keeps the password they already changed).
 
 function required(name: string): string {
   const value = process.env[name];
@@ -44,10 +37,6 @@ async function main() {
     console.log(`Created admin "${username}"`);
   }
 
-  for (const [name, description] of CATEGORIES) {
-    await prisma.category.upsert({ where: { name }, update: {}, create: { name, description } });
-  }
-  console.log(`Categories: ${await prisma.category.count()}`);
 }
 
 main()

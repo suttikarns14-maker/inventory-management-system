@@ -2,7 +2,7 @@
 
 ระบบฐานข้อมูลคลังวัสดุ (Inventory Management System): เว็บสำหรับจัดการข้อมูลวัสดุ บันทึกรับเข้า/เบิกจ่าย และแจ้งเตือนสต็อกต่ำ
 
-**สเปกหลัก: [docs/implementation-spec-v2.1.md](docs/implementation-spec-v2.1.md)** (ใช้แทน v2.0.0 และปรับตาม User Stories แล้ว) ผลการตรวจสเปกเดิมอยู่ที่ [docs/spec-review.md](docs/spec-review.md) ถ้าสเปกกับไฟล์นี้ขัดกัน ให้ถามผู้ใช้ก่อน
+**สเปกหลัก: [docs/implementation-spec-v2.1.md](docs/implementation-spec-v2.1.md)** (ใช้แทน v2.0.0 และปรับตาม User Stories แล้ว) + **[docs/spec-v2.2-it-inventory.md](docs/spec-v2.2-it-inventory.md)** (ข้อมูลคลัง IT จริง: S/N, หน่วยงาน, import Excel) ผลการตรวจสเปกเดิมอยู่ที่ [docs/spec-review.md](docs/spec-review.md) ถ้าสเปกกับไฟล์นี้ขัดกัน ให้ถามผู้ใช้ก่อน
 
 ## Status
 
@@ -45,7 +45,7 @@ Layered architecture: `routes → middlewares → controllers → services → P
 
 ## Domain model
 
-`User` (`username` ใช้ login ไม่ใช่ email · ไม่สนตัวพิมพ์เล็กใหญ่ · role: ADMIN | STAFF | USER, `isActive`), `Category`, `Material` (code unique, `currentQuantity`, `minStock`, `location`, `status` enum ACTIVE/INACTIVE), `StockTransaction` (type IN/OUT, `referenceNo` unique เช่น `TXN-20260927-001`, `reversalOfId` ใช้ยกเลิกรายการ), `StockTransactionItem` (quantity, `unitPrice` Decimal(10,2) ใช้เฉพาะ IN), `ReferenceCounter` (ตัวนับเลขอ้างอิงรายวัน) ดู schema เต็มในสเปก §3
+`User` (`username` ใช้ login ไม่ใช่ email · ไม่สนตัวพิมพ์เล็กใหญ่ · role: ADMIN | STAFF | USER, `isActive`), `Department` (MAIN/SUB), `Building`, `StorageLocation` (ปิดใช้งานแทนการลบ), `MaterialUnit` (S/N ของวัสดุ `SERIAL`, status IN_STOCK/ISSUED/VOID, `isTempSerial`), `TransactionUnit` (S/N ไหนอยู่ในรายการไหน + remark), `Category`, `Material` (code unique, `currentQuantity`, `minStock`, `location`, `status` enum ACTIVE/INACTIVE), `StockTransaction` (type IN/OUT, `referenceNo` unique เช่น `TXN-20260927-001`, `reversalOfId` ใช้ยกเลิกรายการ), `StockTransactionItem` (quantity, `unitPrice` Decimal(10,2) ใช้เฉพาะ IN), `ReferenceCounter` (ตัวนับเลขอ้างอิงรายวัน) ดู schema เต็มในสเปก §3
 
 ## Roles
 
@@ -83,10 +83,13 @@ DB ใช้ snake_case (`@map`) ส่วนโค้ดใช้ camelCase
 - **ห้ามลบหรือแก้รายการรับ-จ่ายเดิม** ให้แก้ด้วยรายการกลับ (reversal) โดย ADMIN เท่านั้น
 - วัสดุ `INACTIVE` ทำรายการไม่ได้ และไม่นับใน dashboard ส่วน dashboard ไม่นับรายการที่ถูกยกเลิกแล้ว
 - ผู้ใช้ห้ามลบ ใช้ `isActive = false` แทน
+- **วัสดุ `SERIAL`:** `currentQuantity` = จำนวน `MaterialUnit` ที่ `IN_STOCK` เสมอ อัปเดตใน DB transaction เดียวกัน · เปลี่ยนสถานะชิ้นแบบมีเงื่อนไข (`updateMany where status = ...` แล้วเช็ก `count`) · S/N ไม่ซ้ำแบบไม่สนตัวพิมพ์ (`DUPLICATE_SERIAL`) · เปลี่ยน `trackingType` ไม่ได้หลังมีรายการ
+- **เบิก (OUT):** ต้องมีหน่วยงานที่เบิก (MAIN) และหน่วยงานที่ใช้ · USER เป็นผู้เบิกเอง ส่วน ADMIN/STAFF เลือกผู้ใช้หรือพิมพ์ชื่อ (`requesterName` เก็บเสมอ)
+- **Import:** นำเข้าครั้งแรกได้เฉพาะตอนระบบยังไม่มีวัสดุ · ของซื้อใหม่นำเข้าผ่านหน้ารับเข้า (ADMIN) ซึ่งใช้ `applyTransaction` ตัวเดียวกับหน้าเว็บ
 
 ## Pending decisions (ต้องถามผู้ใช้ก่อนเขียนส่วนที่เกี่ยวข้อง)
 
-ดูสเปก §10: เหลือแค่หมวดหมู่ตั้งต้นใน seed (S2) · Admin คนแรก username `Admin` รหัสผ่านอยู่ใน `backend/.env` เท่านั้น ห้ามใส่ในโค้ดหรือเอกสาร (S1) · จำนวนเป็นจำนวนเต็มเสมอ (D5) · ADMIN แก้ `code` วัสดุได้ถ้าไม่ซ้ำ (D6)
+ดู `docs/status.md` §1 · Admin คนแรก username `Admin` รหัสผ่านอยู่ใน `backend/.env` เท่านั้น ห้ามใส่ในโค้ดหรือเอกสาร (S1) · seed สร้างแค่ Admin ส่วนหมวดหมู่/หน่วยงาน/อาคาร/สถานที่มาจาก import · `docs/IT_Inventory.xlsx` เป็นข้อมูลจริง ห้ามใช้ใน test อัตโนมัติ (test สร้างไฟล์ตัวอย่างเอง) · จำนวนเป็นจำนวนเต็มเสมอ (D5) · ADMIN แก้ `code` วัสดุได้ถ้าไม่ซ้ำ (D6)
 
 **ลำดับงาน:** Part 1 = Angular FE ที่รันด้วย mock API (interceptor ตอบตามสเปก §4.3 ห้ามคิดรูปแบบ API ขึ้นเอง) ส่วน Part 2 = BE จริงแล้วปิด mock รายละเอียดอยู่ใน `docs/status.md`
 
@@ -104,6 +107,7 @@ Frontend (รันใน `frontend/`):
 - `npm start`: dev server ที่ http://localhost:4200 (ในโหมด mock มีบัญชีทดสอบ username `admin` / `staff` / `user` รหัสผ่าน `password123`)
 - `npm run build`: production build
 - `npm test -- --watch=false`: Vitest (test ของ mock API)
+- mock ไม่รองรับวัสดุ `SERIAL` และ import (ตอบ 400 ให้ใช้ back-end จริง)
 - ไฟล์ component ใช้รูปแบบ Angular 20+ (`login-page.ts` คลาส `LoginPage` ไม่มี suffix `.component`)
 
 Backend (รันใน `backend/`, ต้องเปิด Docker Desktop):

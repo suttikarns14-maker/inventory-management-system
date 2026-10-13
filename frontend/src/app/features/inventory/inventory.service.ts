@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { ApiSuccess } from '../../shared/models/api';
 import { CreateTransactionInput, HistoryQuery, StockTransaction } from '../../shared/models/transaction';
+import { UserOption } from '../../shared/models/user';
 import { API, toParams, unwrap, unwrapPage } from '../../shared/utils/http';
 
 @Injectable({ providedIn: 'root' })
@@ -12,6 +13,11 @@ export class InventoryService {
     return this.http
       .post<ApiSuccess<StockTransaction>>(`${API}/inventory/transactions`, input)
       .pipe(unwrap());
+  }
+
+  /** Active users for the requester picker (ADMIN, STAFF). */
+  userOptions() {
+    return this.http.get<ApiSuccess<UserOption[]>>(`${API}/users/options`).pipe(unwrap());
   }
 
   reverse(id: string, note: string) {

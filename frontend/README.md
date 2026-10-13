@@ -37,4 +37,5 @@ npm start       # http://localhost:4200
 
 - `src/app/core/mock/`: `mock-api.ts` ตอบทุก endpoint ตามสเปก §4.3, `mock-seed.ts` สร้างข้อมูลตัวอย่าง 6 เดือน และ `mock-api.interceptor.ts` ดักคำขอ `/api/*`
 - สลับ mock / back-end จริงได้ที่ `USE_MOCK_API` ใน `src/app/core/mock/mock-backend.ts` โดยหน้าเว็บไม่ต้องแก้
+- โหมด mock ไม่รองรับวัสดุแบบรายชิ้น (S/N) และการนำเข้าจาก Excel ส่วนนี้ต้องใช้ back-end จริง
 - `src/app/shared/models/` คือรูปแบบข้อมูลที่ API ต้องตอบ ซึ่ง back-end ต้องตอบให้ตรงกัน

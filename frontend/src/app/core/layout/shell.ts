@@ -25,8 +25,11 @@ const NAV: NavItem[] = [
   { path: '/materials', label: 'รายการวัสดุ', icon: 'inventory_2' },
   { path: '/inventory/transactions', label: 'รับเข้า / เบิกจ่าย', icon: 'swap_horiz' },
   { path: '/inventory/history', label: 'ประวัติรับ-จ่าย', icon: 'history' },
+  { path: '/units', label: 'ค้นหา S/N', icon: 'qr_code_2', roles: ['ADMIN', 'STAFF'] },
   { path: '/settings/categories', label: 'หมวดหมู่วัสดุ', icon: 'category', roles: ['ADMIN'] },
+  { path: '/settings/lookups', label: 'ข้อมูลอ้างอิง', icon: 'list_alt', roles: ['ADMIN'] },
   { path: '/settings/users', label: 'จัดการผู้ใช้', icon: 'group', roles: ['ADMIN'] },
+  { path: '/settings/import', label: 'นำเข้าข้อมูล', icon: 'upload_file', roles: ['ADMIN'] },
 ];
 
 @Component({
