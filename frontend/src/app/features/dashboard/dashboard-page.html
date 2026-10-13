@@ -104,7 +104,7 @@
       <mat-button-toggle value="count">ตามจำนวนครั้ง</mat-button-toggle>
     </mat-button-toggle-group>
 
-    <ol class="bars">
+    <ol class="bars scroll-box">
       @for (t of top() ?? []; track t.id) {
         @let value = topSort() === 'count' ? t.withdrawalCount : t.totalQuantity;
         <li>
@@ -124,7 +124,7 @@
 
   <section class="card">
     <div class="card-head">
-      <h2>วัสดุที่ไม่ถูกเบิกใช้</h2>
+      <h2>วัสดุที่ไม่ถูกเบิกใช้{{ unused()?.length ? ' (' + unused()!.length + ')' : '' }}</h2>
       <mat-button-toggle-group
         [value]="unusedDays()"
         (change)="unusedDays.set($event.value)"
@@ -136,13 +136,13 @@
         <mat-button-toggle [value]="180">เกิน 180 วัน</mat-button-toggle>
       </mat-button-toggle-group>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap scroll-box">
       <table class="simple">
         <thead>
           <tr>
             <th>วัสดุ</th>
             <th class="num">ค้างในคลัง</th>
-            <th>เบิกล่าสุด</th>
+            <th class="nowrap">เบิกล่าสุด</th>
           </tr>
         </thead>
         <tbody>
@@ -153,7 +153,7 @@
                 <div class="muted">{{ u.code }}</div>
               </td>
               <td class="num">{{ u.currentQuantity }} {{ u.unit }}</td>
-              <td>{{ u.lastOutAt ? (u.lastOutAt | date: 'd MMM y') : 'ไม่เคยเบิก' }}</td>
+              <td class="nowrap">{{ u.lastOutAt ? (u.lastOutAt | date: 'd MMM y') : 'ไม่เคยเบิก' }}</td>
             </tr>
           } @empty {
             <tr>

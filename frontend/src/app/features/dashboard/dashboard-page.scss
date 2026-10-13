@@ -55,7 +55,9 @@
   }
 }
 
-.reorder-scroll {
+// Fixed-height boxes that scroll inside, so the dashboard stays short.
+.reorder-scroll,
+.scroll-box {
   max-height: 500px; // header + 8 rows
   overflow-y: auto;
   border: 1px solid var(--mat-sys-outline-variant);
@@ -106,7 +108,7 @@
 .bars {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 12px;
 
   li + li {
     margin-top: 12px;
@@ -130,4 +132,8 @@
   height: 100%;
   border-radius: 999px;
   background: var(--mat-sys-primary);
+}
+
+.nowrap {
+  white-space: nowrap;
 }
