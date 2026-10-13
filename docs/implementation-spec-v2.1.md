@@ -248,6 +248,7 @@ CREATE UNIQUE INDEX users_username_lower_key ON users (lower(username));
 - `@@unique([transactionId, materialId])` กันวัสดุซ้ำในรายการเดียวระดับ DB (C3)
 - `reversalOfId @unique` ทำให้รายการหนึ่งถูกยกเลิกได้ครั้งเดียว
 - ไม่ใช้ `onDelete: Cascade` เพราะรายการรับ-จ่ายจะไม่ถูกลบ
+- ทุกคอลัมน์ `DateTime` ใช้ `@db.Timestamptz(3)` เพื่อให้การเทียบเวลาใน SQL ถูกต้องไม่ว่า server จะตั้ง timezone อะไร
 - `unitPrice` เป็น optional ใช้บันทึกราคาตอนรับเข้าไว้อ้างอิงเท่านั้น ไม่ได้ใช้ใน Dashboard และไม่บันทึกในรายการ OUT
 - Prisma แปลง `Decimal` เป็น **string** ใน JSON ดังนั้นต้องกำหนด type ฝั่ง front-end ให้ตรงกัน
 
@@ -257,7 +258,9 @@ CREATE UNIQUE INDEX users_username_lower_key ON users (lower(username));
 
 ### 4.1 โครงสร้าง (Layered)
 
-**Libraries:** `express` (v5, ส่ง error จาก async handler เข้า error middleware ให้เอง), `@prisma/client` + `prisma`, `zod`, `jsonwebtoken`, `cookie-parser`, `bcryptjs`, `helmet`, `express-rate-limit` · **Dev:** `typescript`, `tsx` (รันแบบ watch), `vitest` + `supertest`
+**Validation:** controller เรียก `schema.parse()` ของ Zod schema ใน `dtos/index.ts` โดยตรง และ `ZodError` จะถูกแปลงเป็น `VALIDATION_ERROR` ใน error middleware (ไม่มี validate middleware แยก)
+
+**Libraries:** `express` (v5, ส่ง error จาก async handler เข้า error middleware ให้เอง), `@prisma/client` + `prisma` 7 (ต้องใช้ driver adapter `@prisma/adapter-pg` และตั้งค่าใน `prisma.config.ts`), `zod`, `jsonwebtoken`, `cookie-parser`, `bcryptjs`, `helmet`, `express-rate-limit` · **Dev:** `typescript`, `tsx` (รันแบบ watch), `vitest` + `supertest`
 
 ```
 backend/
@@ -781,8 +784,10 @@ export const routes: Routes = [
 
 ## 9. Infrastructure
 
+`backend/docker-compose.yml` (ย่อ ดูไฟล์จริงสำหรับ healthcheck และ DB สำหรับ test):
+
 ```yaml
-# docker-compose.yml
+# backend/docker-compose.yml
 services:
   postgres:
     image: postgres:16-alpine
@@ -805,8 +810,9 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=change-me
 POSTGRES_DB=inventory_db
 DATABASE_URL=postgresql://postgres:change-me@localhost:5432/inventory_db
+TEST_DATABASE_URL=postgresql://postgres:change-me@localhost:5432/inventory_test
 JWT_SECRET=change-me-to-a-long-random-string
-JWT_EXPIRES_IN=8h
+SESSION_HOURS=8
 PORT=3000
 NODE_ENV=development
 SEED_ADMIN_USERNAME=Admin

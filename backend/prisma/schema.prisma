@@ -1,0 +1,115 @@
+// Data model: spec §3. Extra constraints Prisma cannot express (CHECKs, lower(username) index)
+// live in the migration SQL.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  STAFF
+  USER
+}
+
+enum TransactionType {
+  IN
+  OUT
+}
+
+enum MaterialStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model User {
+  id                String             @id @default(uuid())
+  /// Login name. Unique case-insensitively via the users_username_lower_key index.
+  username          String             @unique
+  passwordHash      String             @map("password_hash")
+  fullName          String             @map("full_name")
+  role              Role               @default(USER)
+  isActive          Boolean            @default(true) @map("is_active")
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  stockTransactions StockTransaction[]
+
+  @@map("users")
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  description String?
+  materials   Material[]
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("categories")
+}
+
+model Material {
+  id               String                 @id @default(uuid())
+  code             String                 @unique
+  name             String
+  categoryId       String                 @map("category_id")
+  category         Category               @relation(fields: [categoryId], references: [id])
+  unit             String
+  currentQuantity  Int                    @default(0) @map("current_quantity")
+  minStock         Int                    @default(0) @map("min_stock")
+  location         String?
+  status           MaterialStatus         @default(ACTIVE)
+  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
+  transactionItems StockTransactionItem[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@map("materials")
+}
+
+model StockTransaction {
+  id           String                 @id @default(uuid())
+  type         TransactionType
+  referenceNo  String                 @unique @map("reference_no")
+  createdById  String                 @map("created_by_id")
+  createdBy    User                   @relation(fields: [createdById], references: [id])
+  note         String?
+  reversalOfId String?                @unique @map("reversal_of_id")
+  reversalOf   StockTransaction?      @relation("Reversal", fields: [reversalOfId], references: [id])
+  reversedBy   StockTransaction?      @relation("Reversal")
+  createdAt    DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  items        StockTransactionItem[]
+
+  @@index([type, createdAt])
+  @@index([createdById])
+  @@map("stock_transactions")
+}
+
+model StockTransactionItem {
+  id            String           @id @default(uuid())
+  transactionId String           @map("transaction_id")
+  transaction   StockTransaction @relation(fields: [transactionId], references: [id])
+  materialId    String           @map("material_id")
+  material      Material         @relation(fields: [materialId], references: [id])
+  quantity      Int
+  unitPrice     Decimal?         @map("unit_price") @db.Decimal(10, 2)
+
+  @@unique([transactionId, materialId])
+  @@index([materialId])
+  @@map("stock_transaction_items")
+}
+
+model ReferenceCounter {
+  /// YYYYMMDD in Asia/Bangkok
+  date      String @id
+  lastValue Int    @map("last_value")
+
+  @@map("reference_counters")
+}

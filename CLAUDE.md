@@ -8,7 +8,7 @@
 
 ความคืบหน้าและเรื่องที่รอยืนยันอยู่ที่ [docs/status.md](docs/status.md) ทำงานข้อไหนเสร็จแล้วให้อัปเดตไฟล์นั้นด้วย
 
-`frontend/` (Angular 22, zoneless) ทำครบทุกหน้าแล้ว และรันด้วย mock API (`USE_MOCK_API` ใน `src/app/core/mock/mock-backend.ts`) ส่วน `backend/` ยังมีแค่โครงโฟลเดอร์ (Part 2)
+`frontend/` (Angular 22, zoneless) และ `backend/` (Express 5 + Prisma 7 + PostgreSQL) ทำครบแล้วและต่อกันจริง FE ยังสลับไปใช้ mock API ได้ด้วย `USE_MOCK_API` ใน `src/app/core/mock/mock-backend.ts` (ถ้าแก้กฎทางธุรกิจ ให้แก้ทั้ง BE และ mock)
 
 **API contract:** รูปแบบ response ของแต่ละ entity อยู่ใน `frontend/src/app/shared/models/` back-end ต้องตอบให้ตรงกัน ถ้าต้องเปลี่ยน ให้แก้ model, mock และสเปกพร้อมกัน
 
@@ -18,7 +18,7 @@ Decoupled front-end / back-end คุยกันผ่าน REST (JSON) ที
 
 ```
 frontend/   Angular + TypeScript, standalone components, Signals, Reactive Forms, Angular Material
-backend/    Node.js 24 + TypeScript, Express 5, Prisma, Zod, JWT (HttpOnly cookie), bcryptjs
+backend/    Node.js 24 + TypeScript (ESM), Express 5, Prisma 7 (driver adapter pg, client generated ใน src/generated/), Zod 4, JWT (HttpOnly cookie), bcryptjs
             PostgreSQL 16 รันผ่าน Docker (docker-compose)
 docs/       spec v2.1 และ spec review
 ```
@@ -39,7 +39,7 @@ docs/       spec v2.1 และ spec review
 Layered architecture: `routes → middlewares → controllers → services → Prisma`
 - controllers รับ request และ map response เท่านั้น ไม่มี business logic
 - services เก็บ business logic และ DB transaction ทั้งหมด
-- `dtos/` ใช้ Zod schema ตรวจ input ผ่าน `validate.middleware.ts`
+- controllers ตรวจ input ด้วย Zod schema ใน `dtos/index.ts` (`schema.parse(req.body)`) และ `ZodError` จะถูกแปลงเป็น `VALIDATION_ERROR` พร้อม `details[].field` (เช่น `items.0.quantity`) ใน error middleware
 - error ให้ throw `AppError(status, code, message)` (`utils/app-error.ts`) แล้วให้ `error.middleware.ts` แปลงเป็น response (รายการ code อยู่ในสเปก §4.2)
 - Prisma schema อยู่ที่ `backend/prisma/schema.prisma`
 
@@ -101,9 +101,14 @@ Secrets อยู่ใน `.env` เท่านั้น ห้าม commit `
 ## Commands
 
 Frontend (รันใน `frontend/`):
-- `npm start`: dev server ที่ http://localhost:4200 (บัญชีทดสอบ username `admin` / `staff` / `user` รหัสผ่าน `password123`)
+- `npm start`: dev server ที่ http://localhost:4200 (ในโหมด mock มีบัญชีทดสอบ username `admin` / `staff` / `user` รหัสผ่าน `password123`)
 - `npm run build`: production build
-- `npm test -- --watch=false`: Vitest (ตอนนี้มี test ของ mock API)
+- `npm test -- --watch=false`: Vitest (test ของ mock API)
 - ไฟล์ component ใช้รูปแบบ Angular 20+ (`login-page.ts` คลาส `LoginPage` ไม่มี suffix `.component`)
 
-Backend: _ยังไม่มี (Part 2)_
+Backend (รันใน `backend/`, ต้องเปิด Docker Desktop):
+- `npm run db:up`: เปิด PostgreSQL · `npm run dev`: API ที่ http://localhost:3000/api/v1
+- `npm test`: Vitest + Supertest กับ DB แยก `inventory_test` (ห้ามชี้ test ไปที่ DB จริง)
+- `npm run typecheck`, `npm run db:migrate`, `npm run db:seed`, `npm run db:studio`
+- วันเวลาทุกคอลัมน์เป็น `timestamptz` (container ตั้ง timezone เป็นเวลาไทย) ถ้าเพิ่มคอลัมน์ DateTime ใหม่ต้องใส่ `@db.Timestamptz(3)`
+- `prisma migrate reset` ต้องได้รับอนุญาตจากผู้ใช้ก่อนเสมอ
