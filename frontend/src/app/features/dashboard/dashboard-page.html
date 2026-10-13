@@ -27,11 +27,12 @@
 </div>
 
 <section class="card">
-  <h2>ควรสั่งซื้อ</h2>
+  <h2>ควรสั่งซื้อ{{ reorder()?.length ? ' (' + reorder()!.length + ' รายการ)' : '' }}</h2>
   <p class="muted hint">
     เรียงตามความเร่งด่วน · อัตราการใช้คิดจากการเบิก 90 วันล่าสุด · จำนวนแนะนำให้พอใช้ 30 วัน
   </p>
-  <div class="table-wrap">
+  <!-- Fixed height (~8 rows) so the rest of the dashboard stays close; scroll inside. -->
+  <div class="table-wrap reorder-scroll">
     <table class="simple">
       <thead>
         <tr>
