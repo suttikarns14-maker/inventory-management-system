@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { Page } from '../../shared/models/api';
 import { MaterialUnit } from '../../shared/models/unit';
@@ -66,11 +67,16 @@ export class UnitsPage {
 
   protected readonly canEdit = inject(AuthService).hasRole('ADMIN');
   protected readonly search = signal('');
-  protected readonly tempOnly = signal(false);
+  /** `?tempOnly=true` comes from the dashboard's data-quality card. */
+  protected readonly tempOnly = signal(inject(ActivatedRoute).snapshot.queryParamMap.get('tempOnly') === 'true');
   protected readonly page = signal(1);
   protected readonly result = signal<Page<MaterialUnit> | null>(null);
   protected readonly loading = signal(false);
   private timer?: ReturnType<typeof setTimeout>;
+
+  constructor() {
+    this.load(); // no-op unless tempOnly came from the URL
+  }
 
   protected reload(): void {
     clearTimeout(this.timer);

@@ -524,7 +524,12 @@ AND NOT EXISTS (SELECT 1 FROM stock_transactions r WHERE r.reversal_of_id = t.id
 | `outOfStockCount` | `ACTIVE` และ `currentQuantity = 0` |
 | `neverWithdrawnCount` | `ACTIVE` และไม่เคยมีรายการ OUT |
 | `withdrawalsThisMonth` | จำนวนรายการ OUT ในเดือนนี้ (Asia/Bangkok) |
+| `stockValue` | มูลค่าคลังคงเหลือ (บาท) = Σ `currentQuantity` × ราคาล่าสุด ของวัสดุ `ACTIVE` |
+| `unpricedCount` | วัสดุ `ACTIVE` ที่มีของ แต่ไม่เคยรับเข้าพร้อมราคา (นับมูลค่าเป็น 0) |
+| `valueByCategory` | `[{ id, name, value }]` มูลค่าแยกตามหมวดหมู่ เรียงมากไปน้อย |
+| `dataQuality` | `{ tempSerials, defaultMinStock, missingDepartments }`: S/N ชั่วคราวที่ไม่ใช่ VOID · วัสดุที่จุดสั่งซื้อยังเป็นค่าเริ่มต้นของ import (5) · รายการเบิกที่ไม่มีหน่วยงานที่เบิกหรือหน่วยงานที่ใช้ |
 
+**ราคาล่าสุด** (P4-Q2) = `unit_price` ของรายการ IN ล่าสุดที่มีราคาและไม่ถูกยกเลิก
 ### 6.2 `GET /dashboard/reorder-suggestions`
 
 ค่าคงที่ใน `config/dashboard.ts` (D4):

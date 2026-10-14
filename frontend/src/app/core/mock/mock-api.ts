@@ -32,6 +32,8 @@ export interface MockResponse {
 export const USAGE_WINDOW_DAYS = 90;
 export const ALERT_DAYS = 14;
 export const COVERAGE_DAYS = 30;
+/** Same as the back-end's IMPORT_DEFAULT_MIN_STOCK (decision D13). */
+const IMPORT_DEFAULT_MIN_STOCK = 5;
 
 class MockError extends Error {
   constructor(
@@ -661,6 +663,20 @@ export class MockApi {
     return last;
   }
 
+  /** Latest unit price per material from non-reversed IN lines that have one. */
+  private latestPrices(): Map<string, number> {
+    const reversed = new Set(this.db.transactions.map((t) => t.reversalOfId).filter(Boolean));
+    const latest = new Map<string, { at: string; price: number }>();
+    for (const t of this.db.transactions) {
+      if (t.type !== 'IN' || t.reversalOfId || reversed.has(t.id)) continue;
+      for (const i of t.items) {
+        if (i.unitPrice === null || (latest.get(i.materialId)?.at ?? '') > t.createdAt) continue;
+        latest.set(i.materialId, { at: t.createdAt, price: Number(i.unitPrice) });
+      }
+    }
+    return new Map([...latest].map(([id, p]) => [id, p.price]));
+  }
+
   private activeMaterials(): MaterialRow[] {
     return this.db.materials.filter((m) => m.status === 'ACTIVE');
   }
@@ -670,12 +686,31 @@ export class MockApi {
     const active = this.activeMaterials();
     const lastOut = this.lastOutByMaterial();
     const monthStart = bangkokDayStart(`${bangkokDate().slice(0, 7)}-01`);
+    const prices = this.latestPrices();
+    const valueByCategory = this.db.categories
+      .map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        value: active
+          .filter((m) => m.categoryId === cat.id)
+          .reduce((sum, m) => sum + m.currentQuantity * (prices.get(m.id) ?? 0), 0),
+      }))
+      .filter((cat) => active.some((m) => m.categoryId === cat.id))
+      .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
     const data: DashboardSummary = {
       activeMaterials: active.length,
       reorderCount: this.reorder().length,
       outOfStockCount: active.filter((m) => m.currentQuantity === 0).length,
       neverWithdrawnCount: active.filter((m) => !lastOut.has(m.id)).length,
       withdrawalsThisMonth: this.realWithdrawals().filter((t) => Date.parse(t.createdAt) >= monthStart).length,
+      stockValue: valueByCategory.reduce((sum, cat) => sum + cat.value, 0),
+      unpricedCount: active.filter((m) => m.currentQuantity > 0 && !prices.has(m.id)).length,
+      valueByCategory,
+      dataQuality: {
+        tempSerials: 0, // the mock has no serial units
+        defaultMinStock: active.filter((m) => m.minStock === IMPORT_DEFAULT_MIN_STOCK).length,
+        missingDepartments: this.realWithdrawals().filter((t) => !t.requestingDepartmentId || !t.usingDepartmentId).length,
+      },
     };
     return ok(data);
   }
@@ -746,6 +781,7 @@ export class MockApi {
     const days = c.req.query.get('days');
     const cutoff = days ? new Date(Date.now() - Number(days) * DAY_MS).toISOString() : null;
     const lastOut = this.lastOutByMaterial();
+    const prices = this.latestPrices();
     const data: UnusedMaterial[] = this.activeMaterials()
       .map((m) => ({
         id: m.id,
@@ -757,9 +793,16 @@ export class MockApi {
         currentQuantity: m.currentQuantity,
         createdAt: m.createdAt,
         lastOutAt: lastOut.get(m.id) ?? null,
+        unitPrice: prices.get(m.id) ?? null,
+        value: m.currentQuantity * (prices.get(m.id) ?? 0),
       }))
       .filter((m) => m.lastOutAt === null || (cutoff !== null && m.lastOutAt < cutoff))
-      .sort((a, b) => (a.lastOutAt ?? '').localeCompare(b.lastOutAt ?? '') || b.currentQuantity - a.currentQuantity);
+      .sort(
+        (a, b) =>
+          b.value - a.value ||
+          (a.lastOutAt ?? '').localeCompare(b.lastOutAt ?? '') ||
+          b.currentQuantity - a.currentQuantity,
+      );
     return ok(data);
   }
 

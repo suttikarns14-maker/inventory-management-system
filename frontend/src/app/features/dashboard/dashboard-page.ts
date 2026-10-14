@@ -69,6 +69,16 @@ export class DashboardPage {
     { initialValue: undefined },
   );
 
+  protected readonly unusedValue = computed(() => (this.unused() ?? []).reduce((sum, u) => sum + u.value, 0));
+
+  /** Shown in the data-quality card; same value as the back-end's IMPORT_DEFAULT_MIN_STOCK. */
+  protected readonly defaultMinStock = 5;
+
+  protected valueWidth(value: number): string {
+    const max = Math.max(1, ...(this.summary()?.valueByCategory ?? []).map((c) => c.value));
+    return `${Math.max(2, (value / max) * 100)}%`;
+  }
+
   /** "CODE · brand · model": same-named materials are told apart by brand and model. */
   protected detail(m: MaterialBrief): string {
     return [m.code, m.brand, m.model].filter((x) => x && x !== '-').join(' · ');

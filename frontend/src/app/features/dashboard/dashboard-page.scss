@@ -87,6 +87,52 @@
   }
 }
 
+.spaced {
+  margin-bottom: 20px;
+}
+
+.total {
+  font: var(--mat-sys-headline-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.sub {
+  margin-left: 4px;
+  font: var(--mat-sys-body-medium);
+}
+
+.todo {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  li {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+
+    > span:last-child {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+  }
+
+  .todo-count {
+    min-width: 56px;
+    text-align: right;
+    font: var(--mat-sys-headline-small);
+    font-variant-numeric: tabular-nums;
+    color: var(--app-danger);
+  }
+
+  .done .todo-count {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
 .card-head {
   display: flex;
   flex-wrap: wrap;
