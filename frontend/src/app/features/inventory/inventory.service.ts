@@ -26,6 +26,13 @@ export class InventoryService {
       .pipe(unwrap());
   }
 
+  /** ADMIN: fill in departments that are still empty (imported history). */
+  fillDepartments(id: string, input: { requestingDepartmentId: string | null; usingDepartmentId: string | null }) {
+    return this.http
+      .patch<ApiSuccess<StockTransaction>>(`${API}/inventory/transactions/${id}/departments`, input)
+      .pipe(unwrap());
+  }
+
   history(query: HistoryQuery) {
     return this.http
       .get<ApiSuccess<StockTransaction[]>>(`${API}/inventory/history`, { params: toParams(query) })

@@ -10,9 +10,9 @@
 
 **เริ่ม session ใหม่:** อ่าน [docs/handoff.md](docs/handoff.md) ก่อน (งานที่ค้าง, วิธีทำงานที่ผู้ใช้ต้องการ, ข้อควรรู้เรื่องเครื่องนี้) และอัปเดตไฟล์นั้นตอนจบ session
 
-`frontend/` (Angular 22, zoneless) และ `backend/` (Express 5 + Prisma 7 + PostgreSQL) ทำครบแล้วและต่อกันจริง FE ยังสลับไปใช้ mock API ได้ด้วย `USE_MOCK_API` ใน `src/app/core/mock/mock-backend.ts` (ถ้าแก้กฎทางธุรกิจ ให้แก้ทั้ง BE และ mock)
+`frontend/` (Angular 22, zoneless) และ `backend/` (Express 5 + Prisma 7 + PostgreSQL) ทำครบแล้วและต่อกันจริง โค้ด mock API (`USE_MOCK_API` ใน `src/app/core/mock/mock-backend.ts`) **เลิกอัปเดตแล้วตั้งแต่ 2026-10-14** งานใหม่ทำที่ BE จริงอย่างเดียว ไม่ต้องแก้ mock
 
-**API contract:** รูปแบบ response ของแต่ละ entity อยู่ใน `frontend/src/app/shared/models/` back-end ต้องตอบให้ตรงกัน ถ้าต้องเปลี่ยน ให้แก้ model, mock และสเปกพร้อมกัน
+**API contract:** รูปแบบ response ของแต่ละ entity อยู่ใน `frontend/src/app/shared/models/` back-end ต้องตอบให้ตรงกัน ถ้าต้องเปลี่ยน ให้แก้ model และสเปกพร้อมกัน
 
 ## Architecture
 
@@ -82,7 +82,7 @@ DB ใช้ snake_case (`@map`) ส่วนโค้ดใช้ camelCase
 - ห้ามแก้ `currentQuantity` ตรงๆ ผ่าน `PUT /materials/:id` ยอดต้องเปลี่ยนผ่าน transaction เท่านั้นเพื่อให้มีประวัติ
 - **OUT ต้องหักแบบมีเงื่อนไข** (`updateMany where currentQuantity >= qty` แล้วเช็ก `count`) ห้ามอ่านยอดก่อนแล้วค่อย `increment` เพราะเกิด race condition ได้ และ DB มี `CHECK (current_quantity >= 0)` เป็นด่านสุดท้าย
 - `quantity` ต้องเป็นจำนวนเต็มบวก และห้ามมีวัสดุซ้ำในรายการเดียว
-- **ห้ามลบหรือแก้รายการรับ-จ่ายเดิม** ให้แก้ด้วยรายการกลับ (reversal) โดย ADMIN เท่านั้น
+- **ห้ามลบหรือแก้รายการรับ-จ่ายเดิม** ให้แก้ด้วยรายการกลับ (reversal) โดย ADMIN เท่านั้น · ข้อยกเว้นเดียว (D14): ADMIN เติมหน่วยงานที่เบิก/ที่ใช้ของรายการเบิกได้ **เฉพาะช่องที่ยังว่าง** (`PATCH /inventory/transactions/:id/departments`) ไม่กระทบยอดสต็อก
 - วัสดุ `INACTIVE` ทำรายการไม่ได้ และไม่นับใน dashboard ส่วน dashboard ไม่นับรายการที่ถูกยกเลิกแล้ว
 - ผู้ใช้ห้ามลบ ใช้ `isActive = false` แทน
 - **วัสดุ `SERIAL`:** `currentQuantity` = จำนวน `MaterialUnit` ที่ `IN_STOCK` เสมอ อัปเดตใน DB transaction เดียวกัน · เปลี่ยนสถานะชิ้นแบบมีเงื่อนไข (`updateMany where status = ...` แล้วเช็ก `count`) · S/N ไม่ซ้ำแบบไม่สนตัวพิมพ์ (`DUPLICATE_SERIAL`) · เปลี่ยน `trackingType` ไม่ได้หลังมีรายการ

@@ -74,8 +74,8 @@
       <li [class.done]="q?.missingDepartments === 0">
         <span class="todo-count">{{ q?.missingDepartments ?? '-' }}</span>
         <span>
-          รายการเบิกที่ไม่มีหน่วยงาน
-          <span class="muted">ประวัติเก่าที่จับคู่หน่วยงานไม่ได้ ชื่อเดิมอยู่ในหมายเหตุ (ยังแก้ผ่านหน้าเว็บไม่ได้)</span>
+          <a routerLink="/inventory/history" [queryParams]="{ missingDepartment: true }">รายการเบิกที่ไม่มีหน่วยงาน</a>
+          <span class="muted">ประวัติเก่าที่จับคู่หน่วยงานไม่ได้ ชื่อเดิมอยู่ในหมายเหตุ · ADMIN กดเติมหน่วยงานได้</span>
         </span>
       </li>
     </ul>

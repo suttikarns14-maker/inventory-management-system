@@ -339,6 +339,7 @@ export class AppError extends Error {
 | | PUT | `/materials/:id` | ADMIN | ไม่รับ `currentQuantity` · แก้ `code` ได้ถ้าไม่ซ้ำ (D6) โดยประวัติอ้างถึงวัสดุด้วย `id` จึงไม่กระทบ แต่จะแสดงรหัสใหม่ |
 | **Inventory** | POST | `/inventory/transactions` | IN: ADMIN, STAFF · OUT: ทุก role | 201 |
 | | GET | `/inventory/transactions/:id` | ทุก role | USER ดูได้เฉพาะของตัวเอง |
+| | PATCH | `/inventory/transactions/:id/departments` | ADMIN | เติมหน่วยงานที่ยังว่างของรายการเบิก (D14) ช่องที่มีค่าแล้วตอบ 400 `VALIDATION_ERROR` · history รับ `missingDepartment=true` |
 | | POST | `/inventory/transactions/:id/reverse` | ADMIN | body: `{ note }` (บังคับ) · 201 |
 | | GET | `/inventory/history` | ทุก role | `from`, `to`, `type`, `materialId`, `createdById`, `page`, `limit` · USER ถูกบังคับเป็นของตัวเอง |
 | **Dashboard** | GET | `/dashboard/summary` | ADMIN, STAFF | KPI |

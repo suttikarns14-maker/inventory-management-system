@@ -159,7 +159,15 @@ export const historySchema = pageQuery.extend({
   requestingDepartmentId: z.string().optional(),
   usingDepartmentId: z.string().optional(),
   serial: z.string().trim().optional(),
+  /** Withdrawals still missing a department (imported history that was not matched). */
+  missingDepartment: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
 });
+
+/** ADMIN fills in a department that is still empty (decision D14); either field may be sent. */
+export const fillDepartmentsSchema = z
+  .object({ requestingDepartmentId: optionalId, usingDepartmentId: optionalId })
+  .refine((v) => v.requestingDepartmentId || v.usingDepartmentId, 'กรุณาเลือกหน่วยงานอย่างน้อย 1 ช่อง');
+export type FillDepartmentsInput = z.infer<typeof fillDepartmentsSchema>;
 
 // ---- units (serial numbers) ----
 
