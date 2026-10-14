@@ -27,11 +27,12 @@
 </div>
 
 <section class="card">
-  <h2>ควรสั่งซื้อ</h2>
+  <h2>ควรสั่งซื้อ{{ reorder()?.length ? ' (' + reorder()!.length + ' รายการ)' : '' }}</h2>
   <p class="muted hint">
     เรียงตามความเร่งด่วน · อัตราการใช้คิดจากการเบิก 90 วันล่าสุด · จำนวนแนะนำให้พอใช้ 30 วัน
   </p>
-  <div class="table-wrap">
+  <!-- Fixed height (~8 rows) so the rest of the dashboard stays close; scroll inside. -->
+  <div class="table-wrap reorder-scroll">
     <table class="simple">
       <thead>
         <tr>
@@ -51,7 +52,7 @@
           >
             <td>
               <div>{{ r.name }}</div>
-              <div class="muted">{{ r.code }}</div>
+              <div class="muted">{{ detail(r) }}</div>
             </td>
             <td class="num">{{ r.currentQuantity }} {{ r.unit }}</td>
             <td class="num">{{ r.minStock }}</td>
@@ -103,12 +104,15 @@
       <mat-button-toggle value="count">ตามจำนวนครั้ง</mat-button-toggle>
     </mat-button-toggle-group>
 
-    <ol class="bars">
+    <ol class="bars scroll-box">
       @for (t of top() ?? []; track t.id) {
         @let value = topSort() === 'count' ? t.withdrawalCount : t.totalQuantity;
         <li>
           <div class="bar-label">
-            <span>{{ t.name }}</span>
+            <span>
+              {{ t.name }}
+              <span class="muted brand">{{ detail(t) }}</span>
+            </span>
             <span class="num">
               {{ value }} {{ topSort() === 'count' ? 'ครั้ง' : t.unit }}
             </span>
@@ -123,7 +127,7 @@
 
   <section class="card">
     <div class="card-head">
-      <h2>วัสดุที่ไม่ถูกเบิกใช้</h2>
+      <h2>วัสดุที่ไม่ถูกเบิกใช้{{ unused()?.length ? ' (' + unused()!.length + ')' : '' }}</h2>
       <mat-button-toggle-group
         [value]="unusedDays()"
         (change)="unusedDays.set($event.value)"
@@ -135,13 +139,13 @@
         <mat-button-toggle [value]="180">เกิน 180 วัน</mat-button-toggle>
       </mat-button-toggle-group>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap scroll-box">
       <table class="simple">
         <thead>
           <tr>
             <th>วัสดุ</th>
             <th class="num">ค้างในคลัง</th>
-            <th>เบิกล่าสุด</th>
+            <th class="nowrap">เบิกล่าสุด</th>
           </tr>
         </thead>
         <tbody>
@@ -149,10 +153,10 @@
             <tr>
               <td>
                 <a [routerLink]="['/materials']" [queryParams]="{ search: u.code }">{{ u.name }}</a>
-                <div class="muted">{{ u.code }}</div>
+                <div class="muted">{{ detail(u) }}</div>
               </td>
               <td class="num">{{ u.currentQuantity }} {{ u.unit }}</td>
-              <td>{{ u.lastOutAt ? (u.lastOutAt | date: 'd MMM y') : 'ไม่เคยเบิก' }}</td>
+              <td class="nowrap">{{ u.lastOutAt ? (u.lastOutAt | date: 'd MMM y') : 'ไม่เคยเบิก' }}</td>
             </tr>
           } @empty {
             <tr>

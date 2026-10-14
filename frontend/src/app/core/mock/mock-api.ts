@@ -695,6 +695,8 @@ export class MockApi {
           id: m.id,
           code: m.code,
           name: m.name,
+          brand: m.brand,
+          model: m.model,
           unit: m.unit,
           currentQuantity: m.currentQuantity,
           minStock: m.minStock,
@@ -729,7 +731,7 @@ export class MockApi {
       for (const i of t.items) {
         const m = active.get(i.materialId);
         if (!m) continue;
-        const s = stats.get(m.id) ?? { id: m.id, code: m.code, name: m.name, unit: m.unit, totalQuantity: 0, withdrawalCount: 0 };
+        const s = stats.get(m.id) ?? { id: m.id, code: m.code, name: m.name, brand: m.brand, model: m.model, unit: m.unit, totalQuantity: 0, withdrawalCount: 0 };
         s.totalQuantity += i.quantity;
         s.withdrawalCount += 1;
         stats.set(m.id, s);
@@ -749,6 +751,8 @@ export class MockApi {
         id: m.id,
         code: m.code,
         name: m.name,
+        brand: m.brand,
+        model: m.model,
         unit: m.unit,
         currentQuantity: m.currentQuantity,
         createdAt: m.createdAt,
