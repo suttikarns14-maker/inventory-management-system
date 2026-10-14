@@ -8,6 +8,8 @@
 
 ความคืบหน้าและเรื่องที่รอยืนยันอยู่ที่ [docs/status.md](docs/status.md) ทำงานข้อไหนเสร็จแล้วให้อัปเดตไฟล์นั้นด้วย
 
+**เริ่ม session ใหม่:** อ่าน [docs/handoff.md](docs/handoff.md) ก่อน (งานที่ค้าง, วิธีทำงานที่ผู้ใช้ต้องการ, ข้อควรรู้เรื่องเครื่องนี้) และอัปเดตไฟล์นั้นตอนจบ session
+
 `frontend/` (Angular 22, zoneless) และ `backend/` (Express 5 + Prisma 7 + PostgreSQL) ทำครบแล้วและต่อกันจริง FE ยังสลับไปใช้ mock API ได้ด้วย `USE_MOCK_API` ใน `src/app/core/mock/mock-backend.ts` (ถ้าแก้กฎทางธุรกิจ ให้แก้ทั้ง BE และ mock)
 
 **API contract:** รูปแบบ response ของแต่ละ entity อยู่ใน `frontend/src/app/shared/models/` back-end ต้องตอบให้ตรงกัน ถ้าต้องเปลี่ยน ให้แก้ model, mock และสเปกพร้อมกัน
