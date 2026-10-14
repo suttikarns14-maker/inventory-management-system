@@ -162,7 +162,7 @@ export class TransactionFormPage {
   protected readonly displayName = (d: LookupItem | string | null) => (d && typeof d === 'object' ? d.name : (d ?? ''));
 
   private filterByName<T extends LookupItem>(rows: T[], text: string): T[] {
-    return (text ? rows.filter((r) => r.name.toLowerCase().includes(text)) : rows).slice(0, 50);
+    return text ? rows.filter((r) => r.name.toLowerCase().includes(text)) : rows;
   }
 
   // ---- material search ----

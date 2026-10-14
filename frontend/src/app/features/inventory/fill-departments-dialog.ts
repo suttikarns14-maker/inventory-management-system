@@ -112,7 +112,7 @@ export class FillDepartmentsDialog {
   protected readonly displayName = (d: Department | string | null) => (d && typeof d === 'object' ? d.name : (d ?? ''));
 
   private filter(rows: Department[], text: string): Department[] {
-    return (text ? rows.filter((r) => r.name.toLowerCase().includes(text)) : rows).slice(0, 50);
+    return text ? rows.filter((r) => r.name.toLowerCase().includes(text)) : rows;
   }
 
   protected save(): void {
