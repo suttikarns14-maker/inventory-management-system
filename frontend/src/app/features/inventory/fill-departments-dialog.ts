@@ -1,12 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormControl, FormGroup, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { map } from 'rxjs';
 import { Department } from '../../shared/models/lookup';
 import { StockTransaction } from '../../shared/models/transaction';
 import { Notify } from '../../shared/services/notify';
@@ -38,8 +36,8 @@ const pickedOrEmpty = (c: AbstractControl): ValidationErrors | null =>
         @if (!data.txn.requestingDepartment) {
           <mat-form-field>
             <mat-label>หน่วยงานที่เบิก (หน่วยงานหลัก)</mat-label>
-            <input matInput formControlName="requestingDepartmentId" [matAutocomplete]="reqAuto" placeholder="พิมพ์เพื่อค้นหา" />
-            <mat-autocomplete #reqAuto="matAutocomplete" [displayWith]="displayName" requireSelection>
+            <input matInput formControlName="requestingDepartmentId" [matAutocomplete]="reqAuto" (input)="requestingText.set(typed($event))" placeholder="พิมพ์เพื่อค้นหา" />
+            <mat-autocomplete #reqAuto="matAutocomplete" [displayWith]="displayName" requireSelection (optionSelected)="requestingText.set('')">
               @for (d of requestingOptions(); track d.id) {
                 <mat-option [value]="d">{{ d.name }}</mat-option>
               }
@@ -54,8 +52,8 @@ const pickedOrEmpty = (c: AbstractControl): ValidationErrors | null =>
         @if (!data.txn.usingDepartment) {
           <mat-form-field>
             <mat-label>หน่วยงานที่ใช้</mat-label>
-            <input matInput formControlName="usingDepartmentId" [matAutocomplete]="usingAuto" placeholder="พิมพ์เพื่อค้นหา" />
-            <mat-autocomplete #usingAuto="matAutocomplete" [displayWith]="displayName" requireSelection>
+            <input matInput formControlName="usingDepartmentId" [matAutocomplete]="usingAuto" (input)="usingText.set(typed($event))" placeholder="พิมพ์เพื่อค้นหา" />
+            <mat-autocomplete #usingAuto="matAutocomplete" [displayWith]="displayName" requireSelection (optionSelected)="usingText.set('')">
               @for (d of usingOptions(); track d.id) {
                 <mat-option [value]="d">
                   {{ d.name }}
@@ -100,10 +98,10 @@ export class FillDepartmentsDialog {
   });
   protected readonly saving = signal(false);
 
-  private textOf = (c: FormControl<string | Department>) =>
-    toSignal(c.valueChanges.pipe(map((v) => (typeof v === 'string' ? v.trim().toLowerCase() : ''))), { initialValue: '' });
-  private readonly requestingText = this.textOf(this.form.controls.requestingDepartmentId);
-  private readonly usingText = this.textOf(this.form.controls.usingDepartmentId);
+  // requireSelection keeps the control value unchanged while typing, so filter on the raw input text.
+  protected readonly requestingText = signal('');
+  protected readonly usingText = signal('');
+  protected readonly typed = (e: Event) => (e.target as HTMLInputElement).value.trim().toLowerCase();
   private readonly active = this.data.departments.filter((d) => d.isActive);
   protected readonly requestingOptions = computed(() =>
     this.filter(this.active.filter((d) => d.kind === 'MAIN'), this.requestingText()),
