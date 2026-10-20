@@ -2,8 +2,8 @@
   <h1>ภาพรวมคลัง</h1>
 </div>
 
+@let s = summary();
 <div class="kpis">
-  @let s = summary();
   <div class="kpi">
     <span class="kpi-label">วัสดุที่ใช้งานอยู่</span>
     <span class="kpi-value">{{ s?.activeMaterials ?? '-' }}</span>
@@ -24,6 +24,62 @@
     <span class="kpi-label">รายการเบิกเดือนนี้</span>
     <span class="kpi-value">{{ s?.withdrawalsThisMonth ?? '-' }}</span>
   </div>
+</div>
+
+<div class="two-col spaced">
+  <section class="card">
+    <div class="card-head">
+      <h2>มูลค่าคลังคงเหลือ</h2>
+      <span class="total">{{ s ? (s.stockValue | number: '1.0-0') + ' บาท' : '-' }}</span>
+    </div>
+    <p class="muted hint">
+      คิดจากราคารับเข้าล่าสุดของแต่ละวัสดุ × คงเหลือ
+      @if (s?.unpricedCount) {
+        · <strong>{{ s!.unpricedCount }} วัสดุ</strong>ที่มีของแต่ไม่มีราคา นับเป็น 0
+      }
+    </p>
+    <ol class="bars">
+      @for (c of s?.valueByCategory ?? []; track c.id) {
+        <li>
+          <div class="bar-label">
+            <span>{{ c.name }}</span>
+            <span class="num">{{ c.value | number: '1.0-0' }} บาท</span>
+          </div>
+          <div class="bar-track"><div class="bar" [style.width]="valueWidth(c.value)"></div></div>
+        </li>
+      } @empty {
+        <li class="empty">{{ s === undefined ? 'กำลังโหลด...' : 'ยังไม่มีข้อมูล' }}</li>
+      }
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>งานค้างด้านคุณภาพข้อมูล</h2>
+    <ul class="todo">
+      @let q = s?.dataQuality;
+      <li [class.done]="q?.tempSerials === 0">
+        <span class="todo-count">{{ q?.tempSerials ?? '-' }}</span>
+        <span>
+          <a routerLink="/units" [queryParams]="{ tempOnly: true }">S/N ชั่วคราว</a>
+          <span class="muted">ที่ต้องเปลี่ยนเป็น S/N จริง</span>
+        </span>
+      </li>
+      <li [class.done]="q?.defaultMinStock === 0">
+        <span class="todo-count">{{ q?.defaultMinStock ?? '-' }}</span>
+        <span>
+          <a routerLink="/materials">วัสดุที่จุดสั่งซื้อยังเป็นค่าเริ่มต้น ({{ defaultMinStock }})</a>
+          <span class="muted">ควรตั้งตามการใช้งานจริง เพื่อให้รายการ "ควรสั่งซื้อ" แม่นขึ้น</span>
+        </span>
+      </li>
+      <li [class.done]="q?.missingDepartments === 0">
+        <span class="todo-count">{{ q?.missingDepartments ?? '-' }}</span>
+        <span>
+          <a routerLink="/inventory/history" [queryParams]="{ missingDepartment: true }">รายการเบิกที่ไม่มีหน่วยงาน</a>
+          <span class="muted">ประวัติเก่าที่จับคู่หน่วยงานไม่ได้ ชื่อเดิมอยู่ในหมายเหตุ · ADMIN กดเติมหน่วยงานได้</span>
+        </span>
+      </li>
+    </ul>
+  </section>
 </div>
 
 <section class="card">
@@ -127,7 +183,12 @@
 
   <section class="card">
     <div class="card-head">
-      <h2>วัสดุที่ไม่ถูกเบิกใช้{{ unused()?.length ? ' (' + unused()!.length + ')' : '' }}</h2>
+      <h2>
+        วัสดุที่ไม่ถูกเบิกใช้{{ unused()?.length ? ' (' + unused()!.length + ')' : '' }}
+        @if (unusedValue()) {
+          <span class="muted sub">มูลค่ารวม {{ unusedValue() | number: '1.0-0' }} บาท</span>
+        }
+      </h2>
       <mat-button-toggle-group
         [value]="unusedDays()"
         (change)="unusedDays.set($event.value)"
@@ -145,6 +206,7 @@
           <tr>
             <th>วัสดุ</th>
             <th class="num">ค้างในคลัง</th>
+            <th class="num">มูลค่า (บาท)</th>
             <th class="nowrap">เบิกล่าสุด</th>
           </tr>
         </thead>
@@ -156,11 +218,18 @@
                 <div class="muted">{{ detail(u) }}</div>
               </td>
               <td class="num">{{ u.currentQuantity }} {{ u.unit }}</td>
+              <td class="num">
+                @if (u.unitPrice === null) {
+                  <span class="muted">ไม่มีราคา</span>
+                } @else {
+                  {{ u.value | number: '1.0-0' }}
+                }
+              </td>
               <td class="nowrap">{{ u.lastOutAt ? (u.lastOutAt | date: 'd MMM y') : 'ไม่เคยเบิก' }}</td>
             </tr>
           } @empty {
             <tr>
-              <td colspan="3" class="empty">
+              <td colspan="4" class="empty">
                 {{ unused() === undefined ? 'กำลังโหลด...' : 'ไม่มีวัสดุค้างสต็อกตามเงื่อนไขนี้' }}
               </td>
             </tr>

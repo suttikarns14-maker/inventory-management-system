@@ -165,4 +165,31 @@ describe('history', () => {
     expect((await staff.get(`/api/v1/inventory/history?from=${today}&to=${today}`)).body.data).toHaveLength(1);
     expect((await staff.get('/api/v1/inventory/history?to=2000-01-01')).body.data).toHaveLength(0);
   });
+
+  it('lets ADMIN fill in only an empty department of an imported withdrawal (D14)', async () => {
+    const admin = await loginAs('admin');
+    const staff = await loginAs('staff');
+    const txn = (await staff.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 2))).body.data;
+    // Like imported history whose old "using department" name could not be matched.
+    await prisma.stockTransaction.update({ where: { id: txn.id }, data: { usingDepartmentId: null } });
+    const missing = () => admin.get('/api/v1/inventory/history?missingDepartment=true');
+    expect((await missing()).body.data.map((t: { id: string }) => t.id)).toEqual([txn.id]);
+
+    const url = `/api/v1/inventory/transactions/${txn.id}/departments`;
+    expect((await staff.patch(url).send({ usingDepartmentId: fx.sub.id })).status).toBe(403);
+    // Already set: cannot be changed.
+    const overwrite = await admin.patch(url).send({ requestingDepartmentId: fx.main.id });
+    expect(overwrite.status).toBe(400);
+    expect(overwrite.body.error.details[0].field).toBe('requestingDepartmentId');
+
+    const res = await admin.patch(url).send({ usingDepartmentId: fx.sub.id });
+    expect(res.status).toBe(200);
+    expect(res.body.data.usingDepartment).toMatchObject({ id: fx.sub.id });
+    expect((await missing()).body.data).toHaveLength(0);
+    expect((await admin.patch(url).send({ usingDepartmentId: fx.main.id })).status).toBe(400);
+    expect(await stockOf(fx.paper.id)).toBe(18);
+
+    const receipt = (await admin.post('/api/v1/inventory/transactions').send({ type: 'IN', items: [{ materialId: fx.paper.id, quantity: 1 }] })).body.data;
+    expect((await admin.patch(`/api/v1/inventory/transactions/${receipt.id}/departments`).send({ usingDepartmentId: fx.sub.id })).status).toBe(400);
+  });
 });

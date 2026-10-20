@@ -64,9 +64,10 @@
           matInput
           formControlName="requestingDepartmentId"
           [matAutocomplete]="requestingAuto"
+          (input)="requestingText.set(typed($event))"
           placeholder="พิมพ์เพื่อค้นหา"
         />
-        <mat-autocomplete #requestingAuto="matAutocomplete" [displayWith]="displayName" requireSelection>
+        <mat-autocomplete #requestingAuto="matAutocomplete" [displayWith]="displayName" requireSelection (optionSelected)="requestingText.set('')">
           @for (d of requestingOptions(); track d.id) {
             <mat-option [value]="d">{{ d.name }}</mat-option>
           }
@@ -82,9 +83,10 @@
           matInput
           formControlName="usingDepartmentId"
           [matAutocomplete]="usingAuto"
+          (input)="usingText.set(typed($event))"
           placeholder="หน่วยงานหลักหรือย่อย"
         />
-        <mat-autocomplete #usingAuto="matAutocomplete" [displayWith]="displayName" requireSelection>
+        <mat-autocomplete #usingAuto="matAutocomplete" [displayWith]="displayName" requireSelection (optionSelected)="usingText.set('')">
           @for (d of usingOptions(); track d.id) {
             <mat-option [value]="d">
               {{ d.name }}

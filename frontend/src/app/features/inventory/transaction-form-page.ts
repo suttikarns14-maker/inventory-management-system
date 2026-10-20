@@ -149,8 +149,10 @@ export class TransactionFormPage {
   private textOf = <T>(c: FormControl<string | T>) =>
     toSignal(c.valueChanges.pipe(map((v) => (typeof v === 'string' ? v.trim().toLowerCase() : ''))), { initialValue: '' });
   private readonly requesterText = this.textOf(this.form.controls.requester);
-  private readonly requestingText = this.textOf(this.form.controls.requestingDepartmentId);
-  private readonly usingText = this.textOf(this.form.controls.usingDepartmentId);
+  // requireSelection keeps the control value unchanged while typing, so filter on the raw input text.
+  protected readonly requestingText = signal('');
+  protected readonly usingText = signal('');
+  protected readonly typed = (e: Event) => (e.target as HTMLInputElement).value.trim().toLowerCase();
   protected readonly requesterOptions = computed(() =>
     this.userOptions()
       .filter((u) => `${u.fullName} ${u.username}`.toLowerCase().includes(this.requesterText()))
@@ -162,7 +164,7 @@ export class TransactionFormPage {
   protected readonly displayName = (d: LookupItem | string | null) => (d && typeof d === 'object' ? d.name : (d ?? ''));
 
   private filterByName<T extends LookupItem>(rows: T[], text: string): T[] {
-    return (text ? rows.filter((r) => r.name.toLowerCase().includes(text)) : rows).slice(0, 50);
+    return text ? rows.filter((r) => r.name.toLowerCase().includes(text)) : rows;
   }
 
   // ---- material search ----

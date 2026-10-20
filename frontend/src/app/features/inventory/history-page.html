@@ -72,6 +72,15 @@
       />
     </mat-form-field>
 
+    @if (canReverse) {
+      <mat-checkbox
+        [checked]="!!query().missingDepartment"
+        (change)="setFilter({ missingDepartment: $event.checked || undefined })"
+      >
+        เฉพาะรายการเบิกที่ไม่มีหน่วยงาน
+      </mat-checkbox>
+    }
+
     <button mat-button (click)="clearFilters()">ล้างตัวกรอง</button>
   </div>
 
@@ -162,7 +171,17 @@
             </td>
             <td class="note">{{ t.note ?? '-' }}</td>
             @if (canReverse) {
-              <td>
+              <td class="nowrap">
+                @if (missingDepartment(t)) {
+                  <button
+                    mat-icon-button
+                    (click)="fillDepartments(t)"
+                    matTooltip="เติมหน่วยงาน"
+                    aria-label="เติมหน่วยงาน"
+                  >
+                    <mat-icon>domain_add</mat-icon>
+                  </button>
+                }
                 @if (!t.reversedBy && !t.reversalOf) {
                   <button
                     mat-icon-button

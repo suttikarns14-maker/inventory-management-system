@@ -11,6 +11,8 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { ActivatedRoute } from '@angular/router';
 import { catchError, of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ReasonDialog, ReasonDialogData } from '../../shared/components/reason-dialog';
@@ -23,6 +25,7 @@ import {
 import { LookupService } from '../../shared/services/lookup.service';
 import { Notify } from '../../shared/services/notify';
 import { MaterialService } from '../materials/material.service';
+import { FillDepartmentsData, FillDepartmentsDialog } from './fill-departments-dialog';
 import { InventoryService } from './inventory.service';
 
 @Component({
@@ -38,6 +41,7 @@ import { InventoryService } from './inventory.service';
     MatPaginatorModule,
     MatProgressBarModule,
     MatTooltipModule,
+    MatCheckboxModule,
   ],
   templateUrl: './history-page.html',
   styleUrl: './history-page.scss',
@@ -64,7 +68,12 @@ export class HistoryPage {
     (this.lookups()?.departments ?? []).filter((d) => d.kind === 'MAIN'),
   );
 
-  protected readonly query = signal<HistoryQuery>({ page: 1, limit: 20 });
+  /** `?missingDepartment=true` comes from the dashboard's data-quality card. */
+  protected readonly query = signal<HistoryQuery>({
+    page: 1,
+    limit: 20,
+    missingDepartment: inject(ActivatedRoute).snapshot.queryParamMap.get('missingDepartment') === 'true' || undefined,
+  });
   private serialTimer?: ReturnType<typeof setTimeout>;
   protected readonly result = signal<Page<StockTransaction> | null>(null);
   protected readonly loading = signal(false);
@@ -105,6 +114,22 @@ export class HistoryPage {
         this.loading.set(false);
       },
     });
+  }
+
+  protected missingDepartment(t: StockTransaction): boolean {
+    return t.type === 'OUT' && !t.reversalOf && (!t.requestingDepartment || !t.usingDepartment);
+  }
+
+  protected fillDepartments(txn: StockTransaction): void {
+    const data: FillDepartmentsData = { txn, departments: this.lookups()?.departments ?? [] };
+    this.dialog
+      .open<FillDepartmentsDialog, FillDepartmentsData, StockTransaction>(FillDepartmentsDialog, { data })
+      .afterClosed()
+      .subscribe((updated) => {
+        if (!updated) return;
+        this.notify.success(`บันทึกหน่วยงานของ ${updated.referenceNo} แล้ว`);
+        this.load();
+      });
   }
 
   protected reverse(txn: StockTransaction): void {

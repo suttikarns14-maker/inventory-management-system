@@ -46,6 +46,7 @@ export function apiRouter(): Router {
   r.post('/inventory/transactions', inventory.create);
   r.get('/inventory/transactions/:id', inventory.get);
   r.post('/inventory/transactions/:id/reverse', admin, inventory.reverse);
+  r.patch('/inventory/transactions/:id/departments', admin, inventory.fillDepartments);
   r.get('/inventory/history', inventory.history);
 
   // Serial numbers and reference lists (spec v2.2 §3)

@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
-import type { CreateTransactionInput, historySchema, TransactionItemInput } from '../dtos/index.js';
+import type {
+  CreateTransactionInput,
+  FillDepartmentsInput,
+  historySchema,
+  TransactionItemInput,
+} from '../dtos/index.js';
 import { Prisma, type TrackingType, type TransactionType } from '../generated/prisma/client.js';
 import { prisma, type Tx } from '../lib/prisma.js';
 import type { SessionUser } from '../middlewares/auth.middleware.js';
@@ -383,6 +388,54 @@ export async function reverseTransaction(admin: SessionUser, id: string, note: s
   }
 }
 
+// ---- fill in missing departments ----
+
+/**
+ * The one allowed change to an existing transaction (decision D14): ADMIN fills in a department
+ * that the import could not match. Only empty fields can be set, so nothing already recorded
+ * is overwritten, and stock is not touched.
+ */
+export async function fillDepartments(admin: SessionUser, id: string, input: FillDepartmentsInput) {
+  const txn = await prisma.stockTransaction.findUnique({ where: { id } });
+  if (!txn) throw notFound('ไม่พบรายการ');
+  if (txn.type !== 'OUT' || txn.reversalOfId) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'เติมหน่วยงานได้เฉพาะรายการเบิกจ่าย');
+  }
+
+  const [requesting, using] = await Promise.all([
+    input.requestingDepartmentId ? prisma.department.findUnique({ where: { id: input.requestingDepartmentId } }) : null,
+    input.usingDepartmentId ? prisma.department.findUnique({ where: { id: input.usingDepartmentId } }) : null,
+  ]);
+  const errors: FieldError[] = [];
+  const filled = 'รายการนี้มีหน่วยงานอยู่แล้ว แก้ไขไม่ได้';
+  if (input.requestingDepartmentId) {
+    if (txn.requestingDepartmentId) errors.push({ field: 'requestingDepartmentId', message: filled });
+    else if (!requesting?.isActive || requesting.kind !== 'MAIN') {
+      errors.push({ field: 'requestingDepartmentId', message: 'หน่วยงานที่เบิกต้องเป็นหน่วยงานหลัก' });
+    }
+  }
+  if (input.usingDepartmentId) {
+    if (txn.usingDepartmentId) errors.push({ field: 'usingDepartmentId', message: filled });
+    else if (!using?.isActive) errors.push({ field: 'usingDepartmentId', message: 'ไม่พบหน่วยงานที่เลือก' });
+  }
+  if (errors.length) throw new AppError(400, 'VALIDATION_ERROR', 'ข้อมูลไม่ถูกต้อง', errors);
+
+  // Conditional on the fields still being empty, so two admins cannot overwrite each other.
+  const { count } = await prisma.stockTransaction.updateMany({
+    where: {
+      id,
+      ...(input.requestingDepartmentId && { requestingDepartmentId: null }),
+      ...(input.usingDepartmentId && { usingDepartmentId: null }),
+    },
+    data: {
+      ...(input.requestingDepartmentId && { requestingDepartmentId: input.requestingDepartmentId }),
+      ...(input.usingDepartmentId && { usingDepartmentId: input.usingDepartmentId }),
+    },
+  });
+  if (count === 0) throw new AppError(400, 'VALIDATION_ERROR', filled);
+  return getTransaction(admin, id);
+}
+
 // ---- read ----
 
 /** USER may only see their own transactions (spec §1); others get 404, not 403, to avoid leaking ids. */
@@ -407,6 +460,12 @@ export async function history(user: SessionUser, q: z.infer<typeof historySchema
     ...(q.materialId && { items: { some: { materialId: q.materialId } } }),
     ...(q.requestingDepartmentId && { requestingDepartmentId: q.requestingDepartmentId }),
     ...(q.usingDepartmentId && { usingDepartmentId: q.usingDepartmentId }),
+    ...(q.missingDepartment && {
+      type: 'OUT' as const,
+      reversalOfId: null,
+      // AND, not OR at the top level: the USER filter below uses OR too.
+      AND: [{ OR: [{ requestingDepartmentId: null }, { usingDepartmentId: null }] }],
+    }),
     ...(q.serial && { units: { some: { unit: { serialNumber: { contains: q.serial, mode: 'insensitive' } } } } }),
     // USER sees what they recorded or what was withdrawn in their name.
     ...(user.role === 'USER'

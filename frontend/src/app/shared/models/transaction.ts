@@ -98,6 +98,8 @@ export interface HistoryQuery {
   requestingDepartmentId?: string;
   usingDepartmentId?: string;
   serial?: string;
+  /** Withdrawals still missing a department (imported history). */
+  missingDepartment?: boolean;
   page?: number;
   limit?: number;
 }
