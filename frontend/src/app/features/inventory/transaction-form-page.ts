@@ -115,7 +115,6 @@ export class TransactionFormPage {
 
   // ---- reference data ----
   private readonly lookups = toSignal(inject(LookupService).all());
-  protected readonly mainDepartments = computed(() => active(this.lookups()?.departments).filter((d) => d.kind === 'MAIN'));
   protected readonly allDepartments = computed(() => active(this.lookups()?.departments));
   protected readonly buildings = computed(() => active(this.lookups()?.buildings));
   protected readonly floors = computed(() => this.lookups()?.floors ?? []);
@@ -158,7 +157,7 @@ export class TransactionFormPage {
       .filter((u) => `${u.fullName} ${u.username}`.toLowerCase().includes(this.requesterText()))
       .slice(0, 30),
   );
-  protected readonly requestingOptions = computed(() => this.filterByName(this.mainDepartments(), this.requestingText()));
+  protected readonly requestingOptions = computed(() => this.filterByName(this.allDepartments(), this.requestingText()));
   protected readonly usingOptions = computed(() => this.filterByName(this.allDepartments(), this.usingText()));
   protected readonly displayUser = (u: UserOption | string | null) => (u && typeof u === 'object' ? u.fullName : (u ?? ''));
   protected readonly displayName = (d: LookupItem | string | null) => (d && typeof d === 'object' ? d.name : (d ?? ''));
@@ -249,7 +248,7 @@ export class TransactionFormPage {
     const serials = parseSerials(c.value as string);
     if (!serials.length) return { required: true };
     const lower = serials.map((s) => s.toLowerCase());
-    const dup = serials.find((_, i) => lower.indexOf(lower[i]!) !== i);
+    const dup = serials.find((s, i) => s !== '-' && lower.indexOf(lower[i]!) !== i);
     if (dup) return { duplicate: dup };
     const bad = serials.find((s) => /\s/.test(s) || s.length > 100);
     return bad ? { invalid: bad } : null;
@@ -302,18 +301,18 @@ export class TransactionFormPage {
     this.searchUnits(line);
   }
 
-  /** Adds the first N units still in stock — quicker than picking 20 serials by hand. */
+  /** No serial given: adds N placeholder (-TEMP-SN-) units still in stock, so real serials stay for when they are known. */
   protected addFirstUnits(line: Line): void {
     const want = line.controls.autoCount.value ?? 0;
     if (want < 1) return;
     const taken = new Set(line.controls.units.controls.map((u) => u.controls.unit.value.id));
     this.unitService
-      .forMaterial(line.controls.material.value.id, { status: 'IN_STOCK', limit: Math.min(want + taken.size, 100) })
+      .forMaterial(line.controls.material.value.id, { status: 'IN_STOCK', tempOnly: true, limit: Math.min(want + taken.size, 100) })
       .subscribe({
         next: (p) => {
           const free = p.items.filter((u) => !taken.has(u.id)).slice(0, want);
           free.forEach((u) => this.pickUnit(line, u));
-          if (free.length < want) this.notify.error(`มีในคลังให้เลือกได้อีก ${free.length} ชิ้น`);
+          if (free.length < want) this.notify.error(`S/N ชั่วคราวเหลือให้เลือกได้อีก ${free.length} ชิ้น ที่เหลือกรุณาเลือก S/N`);
           line.controls.autoCount.setValue(null);
         },
         error: (err: unknown) => this.notify.error(err),

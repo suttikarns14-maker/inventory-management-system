@@ -107,8 +107,8 @@ function groupMaterials(rows: SheetRow[], counts: Map<string, number>) {
       category: rs[0]!.type || 'ไม่ระบุประเภท',
       storage: mostCommon(rs.map((r) => r.storage)),
       validSerials,
-      // Partly serialised materials are tracked per unit with placeholders (decision D15).
-      proposed: (validSerials > 0 ? 'SERIAL' : 'QUANTITY') as TrackingType,
+      // Every material is tracked per unit; rows without a real serial get placeholders (D15, 2026-10-25).
+      proposed: 'SERIAL' as TrackingType,
     };
   });
 }
@@ -205,7 +205,7 @@ export async function previewInitialImport(user: SessionUser, file: Buffer) {
     if (!r.date) issues.push({ row: r.row, message: 'เบิกแล้วแต่ไม่มีวันที่เบิก (จะใช้วันเริ่มปีงบประมาณ)', blocking: false });
     else if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) issues.push({ row: r.row, message: `วันที่เบิกไม่ถูกต้อง "${r.date}"`, blocking: true });
     if (!r.requester) issues.push({ row: r.row, message: 'เบิกแล้วแต่ไม่มีชื่อผู้เบิก (จะบันทึกเป็น "ไม่ระบุ")', blocking: false });
-    if (r.requestingDept && !lookups.main.includes(r.requestingDept)) bump(unmatched.requestingDepartments, r.requestingDept);
+    if (r.requestingDept && !allDepartments.has(r.requestingDept)) bump(unmatched.requestingDepartments, r.requestingDept);
     if (r.usingDept && !allDepartments.has(r.usingDept)) bump(unmatched.usingDepartments, r.usingDept);
     if (r.building && !lookups.buildings.includes(r.building)) bump(unmatched.buildings, r.building);
     if (r.floor && !(FLOORS as readonly string[]).includes(r.floor)) issues.push({ row: r.row, message: `ชั้น "${r.floor}" ไม่อยู่ในรายการ (จะเก็บในหมายเหตุ)`, blocking: false });
@@ -246,7 +246,6 @@ function describeInitial(plan: InitialPlan) {
       buildings: toList(plan.unmatched.buildings),
     },
     options: {
-      mainDepartments: plan.lookups.main,
       allDepartments: [...plan.lookups.main, ...plan.lookups.sub],
       buildings: plan.lookups.buildings,
     },
@@ -387,7 +386,7 @@ export async function commitInitialImport(user: SessionUser, input: z.infer<type
       for (const r of plan.rows.filter((x) => x.status === WITHDRAWN)) outs.set(withdrawalKey(r), [...(outs.get(withdrawalKey(r)) ?? []), r]);
       for (const rs of outs.values()) {
         const r = rs[0]!;
-        const requesting = map(input.mapping.requestingDepartments, (v) => plan.lookups.main.includes(v), departments, r.requestingDept);
+        const requesting = map(input.mapping.requestingDepartments, (v) => allDepartments.has(v), departments, r.requestingDept);
         const using = map(input.mapping.usingDepartments, (v) => allDepartments.has(v), departments, r.usingDept);
         const building = map(input.mapping.buildings, (v) => plan.lookups.buildings.includes(v), buildings, r.building);
         const floorOk = !r.floor || (FLOORS as readonly string[]).includes(r.floor);

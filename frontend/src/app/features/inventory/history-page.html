@@ -56,7 +56,7 @@
         (selectionChange)="setFilter({ requestingDepartmentId: $event.value || undefined })"
       >
         <mat-option value="">ทั้งหมด</mat-option>
-        @for (d of mainDepartments(); track d.id) {
+        @for (d of departments(); track d.id) {
           <mat-option [value]="d.id">{{ d.name }}</mat-option>
         }
       </mat-select>

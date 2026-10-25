@@ -86,7 +86,7 @@ export interface Line {
   materialId: string;
   quantity: number;
   unitPrice?: number | undefined;
-  /** SERIAL + IN: new serial numbers */
+  /** SERIAL + IN: new serial numbers; "-" = none, a <code>-TEMP-SN-NN placeholder is created */
   serialNumbers?: string[];
   /** Subset of serialNumbers that are import placeholders (-TEMP-SN-) */
   tempSerials?: Set<string>;
@@ -121,7 +121,7 @@ export async function applyTransaction(
   const run = async (tx: Tx) => {
     const materials = await tx.material.findMany({
       where: { id: { in: items.map((i) => i.materialId) } },
-      select: { id: true, name: true, unit: true, status: true, trackingType: true, storageLocationId: true },
+      select: { id: true, code: true, name: true, unit: true, status: true, trackingType: true, storageLocationId: true },
     });
     const byId = new Map(materials.map((m) => [m.id, m]));
     for (const item of items) {
@@ -147,13 +147,16 @@ export async function applyTransaction(
 
       // Serial units change state first; the quantity update below then keeps the totals in sync.
       if (item.serialNumbers) {
-        for (const serialNumber of item.serialNumbers) {
+        const missing = item.serialNumbers.filter((s) => s === NO_SERIAL).length;
+        const temps = missing ? await nextTempSerials(tx, m.code, missing) : [];
+        const tempSerials = new Set([...(item.tempSerials ?? []), ...temps]);
+        for (const serialNumber of [...item.serialNumbers.filter((s) => s !== NO_SERIAL), ...temps]) {
           const id = randomUUID();
           newUnits.push({
             id,
             materialId: m.id,
             serialNumber,
-            isTempSerial: item.tempSerials?.has(serialNumber) ?? false,
+            isTempSerial: tempSerials.has(serialNumber),
             storageLocationId: m.storageLocationId,
           });
           links.push({ unitId: id, remark: null });
@@ -233,6 +236,19 @@ export async function applyTransaction(
     return toTransactionDto(await tx.stockTransaction.findUniqueOrThrow({ where: { id: txn.id }, select: transactionSelect }));
   };
   return outer ? run(outer) : prisma.$transaction(run);
+}
+
+export const NO_SERIAL = '-';
+
+/** The next `count` free placeholders for a material: <code>-TEMP-SN-NN, numbered after the highest one. */
+async function nextTempSerials(tx: Tx, code: string, count: number): Promise<string[]> {
+  const prefix = `${code}-TEMP-SN-`;
+  const [row] = await tx.$queryRaw<{ n: number }[]>`
+    SELECT coalesce(max(substring(serial_number from char_length(${prefix}) + 1)::int), 0)::int AS n
+    FROM material_units WHERE lower(serial_number) LIKE lower(${prefix}) || '%'
+      AND substring(serial_number from char_length(${prefix}) + 1) ~ '^[0-9]+$'`;
+  const start = row?.n ?? 0;
+  return Array.from({ length: count }, (_, i) => `${prefix}${String(start + i + 1).padStart(2, '0')}`);
 }
 
 /** Rejects serial numbers that already exist (case-insensitive), listing them in the message. */
@@ -329,9 +345,7 @@ async function withdrawalHeader(user: SessionUser, input: CreateTransactionInput
     input.buildingId ? prisma.building.findUnique({ where: { id: input.buildingId } }) : null,
   ]);
   if (!input.requestingDepartmentId) errors.push({ field: 'requestingDepartmentId', message: 'กรุณาเลือกหน่วยงานที่เบิก' });
-  else if (!requesting?.isActive || requesting.kind !== 'MAIN') {
-    errors.push({ field: 'requestingDepartmentId', message: 'หน่วยงานที่เบิกต้องเป็นหน่วยงานหลัก' });
-  }
+  else if (!requesting?.isActive) errors.push({ field: 'requestingDepartmentId', message: 'ไม่พบหน่วยงานที่เลือก' });
   if (!input.usingDepartmentId) errors.push({ field: 'usingDepartmentId', message: 'กรุณาเลือกหน่วยงานที่ใช้' });
   else if (!using?.isActive) errors.push({ field: 'usingDepartmentId', message: 'ไม่พบหน่วยงานที่เลือก' });
   if (input.buildingId && !building?.isActive) errors.push({ field: 'buildingId', message: 'ไม่พบอาคารที่เลือก' });
@@ -410,9 +424,7 @@ export async function fillDepartments(admin: SessionUser, id: string, input: Fil
   const filled = 'รายการนี้มีหน่วยงานอยู่แล้ว แก้ไขไม่ได้';
   if (input.requestingDepartmentId) {
     if (txn.requestingDepartmentId) errors.push({ field: 'requestingDepartmentId', message: filled });
-    else if (!requesting?.isActive || requesting.kind !== 'MAIN') {
-      errors.push({ field: 'requestingDepartmentId', message: 'หน่วยงานที่เบิกต้องเป็นหน่วยงานหลัก' });
-    }
+    else if (!requesting?.isActive) errors.push({ field: 'requestingDepartmentId', message: 'ไม่พบหน่วยงานที่เลือก' });
   }
   if (input.usingDepartmentId) {
     if (txn.usingDepartmentId) errors.push({ field: 'usingDepartmentId', message: filled });

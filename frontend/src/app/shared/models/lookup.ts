@@ -5,7 +5,7 @@ export interface LookupItem {
   isActive: boolean;
 }
 
-/** MAIN = หน่วยงานหลัก (can request and use); SUB = หน่วยงานย่อย (can only use). */
+/** MAIN = หน่วยงานหลัก, SUB = หน่วยงานย่อย. Either can request and use. */
 export type DepartmentKind = 'MAIN' | 'SUB';
 
 export interface Department extends LookupItem {

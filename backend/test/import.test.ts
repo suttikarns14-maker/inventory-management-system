@@ -55,7 +55,7 @@ const sample: Row[] = [
   { name: 'RAM 16 GB', brand: 'Apacer', model: 'AS16', sn: 'R2', status: 'เบิกแล้ว', by: 'สมชาย', reqDept: IT, useDept: 'ER', date: new Date('2025-01-14'), building: 'อาคารพัชรกิติยาภา', floor: '3', purpose: 'Notebook นศพ', remark: 'VJRNB0300' },
   { name: 'RAM  16 GB', brand: 'Apacer', model: 'AS16', sn: '-' },
   { name: 'RAM 16 GB', brand: 'Apacer', model: 'AS16', sn: 'R3', fy: 2567, project: 'วัสดุปลายเปิดปี 2567' },
-  // Cable ties: repeated product barcode is not a serial -> QUANTITY
+  // Cable ties: repeated product barcode is not a serial; proposed SERIAL, the admin picks QUANTITY
   { name: 'Cable Tie', brand: 'UGREEN', type: CON, sn: '8859596018072', price: 110 },
   { name: 'Cable Tie', brand: 'UGREEN', type: CON, sn: '8859596018072', status: 'เบิกแล้ว', by: 'สมชาย', reqDept: IT, useDept: 'ER', date: new Date('2025-01-14'), building: 'อาคารพัชรกิติยาภา', floor: '3', purpose: 'Notebook นศพ', remark: 'ใช้รัดสาย' },
   { name: 'Cable Tie', brand: 'UGREEN', type: CON, sn: '8859596018072', status: 'เบิกแล้ว', by: '', reqDept: 'ER', useDept: IT, date: '' },
@@ -78,7 +78,7 @@ describe('initial import (spec v2.2 §5.1-5.3)', () => {
     expect(p.summary).toEqual({ rows: 7, materials: 2, inStockUnits: 4, withdrawnUnits: 3, receipts: 2, withdrawals: 2 });
     expect(p.materials.map((m: { code: string; proposed: string; validSerials: number }) => [m.code, m.proposed, m.validSerials])).toEqual([
       ['HW-001', 'SERIAL', 3],
-      ['CON-001', 'QUANTITY', 0],
+      ['CON-001', 'SERIAL', 0],
     ]);
     // "ER" is not in Dropdowndata: listed for the admin to map (decision D14).
     expect(p.unmatched.usingDepartments).toEqual([{ value: 'ER', rows: 2 }]);
@@ -91,6 +91,7 @@ describe('initial import (spec v2.2 §5.1-5.3)', () => {
       importId: p.importId,
       // Admin maps "ER" for the requesting department to the emergency department.
       mapping: { requestingDepartments: { ER: 'ภาควิชาเวชศาสตร์ฉุกเฉิน' } },
+      tracking: { [p.materials[1].key]: 'QUANTITY' },
     });
     expect(commit.status).toBe(201);
     expect(commit.body.data).toMatchObject({ materials: 2, serialMaterials: 1, units: 4, tempSerials: 1, receipts: 2, withdrawals: 2, inStock: 4 });

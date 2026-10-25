@@ -35,6 +35,19 @@ describe('serial-tracked materials (spec v2.2 §2.3)', () => {
     expect(await unitsOf('IN_STOCK')).toHaveLength(3);
   });
 
+  it('creates numbered placeholders for units received with "-" instead of a serial', async () => {
+    const staff = await loginAs('staff');
+    expect((await staff.post('/api/v1/inventory/transactions').send(receive(['SN-A', '-', '-']))).status).toBe(201);
+    expect((await staff.post('/api/v1/inventory/transactions').send(receive(['-']))).status).toBe(201);
+    expect((await unitsOf()).map((u) => [u.serialNumber, u.isTempSerial])).toEqual([
+      ['HW-001-TEMP-SN-01', true],
+      ['HW-001-TEMP-SN-02', true],
+      ['HW-001-TEMP-SN-03', true],
+      ['SN-A', false],
+    ]);
+    expect(await stockOf(ramId)).toBe(4);
+  });
+
   it('rejects duplicate serial numbers in any letter case, and requires serials', async () => {
     const staff = await loginAs('staff');
     await staff.post('/api/v1/inventory/transactions').send(receive(['SN-A']));
@@ -111,7 +124,7 @@ describe('serial-tracked materials (spec v2.2 §2.3)', () => {
 });
 
 describe('withdrawal details (spec v2.2 D10, D11, Q2)', () => {
-  it('requires both departments, and the requesting one must be a main department', async () => {
+  it('requires both departments; either may be a main or a sub department', async () => {
     const staff = await loginAs('staff');
     const base = { type: 'OUT', requesterName: 'x', items: [{ materialId: fx.paper.id, quantity: 1 }] };
     const none = await staff.post('/api/v1/inventory/transactions').send(base);
@@ -122,7 +135,7 @@ describe('withdrawal details (spec v2.2 D10, D11, Q2)', () => {
     const subAsRequesting = await staff
       .post('/api/v1/inventory/transactions')
       .send({ ...base, requestingDepartmentId: fx.sub.id, usingDepartmentId: fx.main.id });
-    expect(subAsRequesting.body.error.details[0].field).toBe('requestingDepartmentId');
+    expect(subAsRequesting.status).toBe(201);
   });
 
   it('USER is always the requester; STAFF may pick a user, who then sees it in their history', async () => {
