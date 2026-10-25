@@ -231,7 +231,7 @@
                   formControlName="serialNumbers"
                   [id]="'line-' + m.id"
                   [errorStateMatcher]="errorMatcher"
-                  placeholder="1 บรรทัดต่อ 1 S/N · วางจาก Excel หรือยิงบาร์โค้ดได้"
+                  placeholder="1 บรรทัดต่อ 1 S/N · วางจาก Excel หรือยิงบาร์โค้ดได้ · ชิ้นที่ไม่มี S/N ใส่ - ระบบจะสร้าง S/N ชั่วคราวให้"
                 ></textarea>
                 @let sn = line.controls.serialNumbers;
                 @if (sn.hasError('duplicate')) {
@@ -286,7 +286,7 @@
                   <mat-label>จำนวน</mat-label>
                   <input matInput type="number" min="1" formControlName="autoCount" />
                 </mat-form-field>
-                <button mat-stroked-button type="button" (click)="addFirstUnits(line)">เพิ่ม N ชิ้นแรกในคลัง</button>
+                <button mat-stroked-button type="button" (click)="addFirstUnits(line)">ไม่ระบุ S/N: ใช้ S/N ชั่วคราว</button>
               </div>
             </div>
             @if (line.controls.units.length) {

@@ -107,8 +107,8 @@ function groupMaterials(rows: SheetRow[], counts: Map<string, number>) {
       category: rs[0]!.type || 'ไม่ระบุประเภท',
       storage: mostCommon(rs.map((r) => r.storage)),
       validSerials,
-      // Partly serialised materials are tracked per unit with placeholders (decision D15).
-      proposed: (validSerials > 0 ? 'SERIAL' : 'QUANTITY') as TrackingType,
+      // Every material is tracked per unit; rows without a real serial get placeholders (D15, 2026-10-25).
+      proposed: 'SERIAL' as TrackingType,
     };
   });
 }

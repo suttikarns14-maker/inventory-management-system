@@ -35,6 +35,19 @@ describe('serial-tracked materials (spec v2.2 §2.3)', () => {
     expect(await unitsOf('IN_STOCK')).toHaveLength(3);
   });
 
+  it('creates numbered placeholders for units received with "-" instead of a serial', async () => {
+    const staff = await loginAs('staff');
+    expect((await staff.post('/api/v1/inventory/transactions').send(receive(['SN-A', '-', '-']))).status).toBe(201);
+    expect((await staff.post('/api/v1/inventory/transactions').send(receive(['-']))).status).toBe(201);
+    expect((await unitsOf()).map((u) => [u.serialNumber, u.isTempSerial])).toEqual([
+      ['HW-001-TEMP-SN-01', true],
+      ['HW-001-TEMP-SN-02', true],
+      ['HW-001-TEMP-SN-03', true],
+      ['SN-A', false],
+    ]);
+    expect(await stockOf(ramId)).toBe(4);
+  });
+
   it('rejects duplicate serial numbers in any letter case, and requires serials', async () => {
     const staff = await loginAs('staff');
     await staff.post('/api/v1/inventory/transactions').send(receive(['SN-A']));
