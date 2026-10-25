@@ -47,7 +47,7 @@ export interface InitialImportPreview {
     usingDepartments: UnmatchedValue[];
     buildings: UnmatchedValue[];
   };
-  options: { mainDepartments: string[]; allDepartments: string[]; buildings: string[] };
+  options: { allDepartments: string[]; buildings: string[] };
   issues: ImportIssue[];
 }
 

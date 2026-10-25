@@ -26,7 +26,7 @@
 |---|---|---|
 | D9 | วิธีติดตาม | แต่ละวัสดุเป็น `QUANTITY` (ยอดรวม) หรือ `SERIAL` (รายชิ้น) |
 | D10 | ผู้เบิก | **USER:** ผู้เบิกคือตัวเองเสมอ · **ADMIN/STAFF:** เลือกผู้ใช้ในระบบ **หรือพิมพ์ชื่อเอง** |
-| D11 | หน่วยงาน | เลือกจากรายการ · **หน่วยงานที่เบิก** = หน่วยงานหลักเท่านั้น · **หน่วยงานที่ใช้** = หลักหรือย่อย · ไม่มีลำดับชั้น เพราะ Dropdowndata ไม่ได้ระบุว่าหน่วยงานย่อยอยู่ใต้หน่วยงานหลักไหน |
+| D11 | หน่วยงาน | เลือกจากรายการ · **หน่วยงานที่เบิก** และ **หน่วยงานที่ใช้** = หลักหรือย่อย (เดิมหน่วยงานที่เบิกต้องเป็นหลัก ผู้ใช้เปลี่ยน 2026-10-25) · ไม่มีลำดับชั้น เพราะ Dropdowndata ไม่ได้ระบุว่าหน่วยงานย่อยอยู่ใต้หน่วยงานหลักไหน |
 | D12 | สถานที่ | อาคาร, ชั้น, สถานที่เก็บของ เลือกจากรายการใน Dropdowndata |
 | D13 | ค่าตั้งต้นตอน import | จุดสั่งซื้อ = **5** ทุกรายการ · หน่วยนับ = **"ชิ้น"** (Excel ไม่มีหน่วย แก้ทีหลังได้) |
 | D14 | หน่วยงานเก่าที่ไม่อยู่ในรายการ | **Admin จับคู่ตอน import** ถ้าไม่จับคู่จะเก็บชื่อเดิมไว้ในหมายเหตุ ข้อมูลไม่หาย |
@@ -40,8 +40,8 @@
 
 ```prisma
 enum DepartmentKind {
-  MAIN   // หน่วยงานหลัก: ใช้เป็น "หน่วยงานที่เบิก" และ "หน่วยงานที่ใช้" ได้
-  SUB    // หน่วยงานย่อย: ใช้เป็น "หน่วยงานที่ใช้" ได้อย่างเดียว
+  MAIN   // หน่วยงานหลัก
+  SUB    // หน่วยงานย่อย (ทั้งสองแบบใช้เป็น "หน่วยงานที่เบิก" และ "หน่วยงานที่ใช้" ได้)
 }
 
 model Department {
@@ -144,7 +144,7 @@ model StockTransaction {
   // เบิก (OUT)
   requesterId             String? @map("requester_id")     // ผู้เบิกที่เป็นผู้ใช้ในระบบ
   requesterName           String  @map("requester_name")   // ชื่อที่แสดงเสมอ (ชื่อผู้ใช้ หรือชื่อที่พิมพ์)
-  requestingDepartmentId  String? @map("requesting_department_id")  // ต้องเป็น MAIN
+  requestingDepartmentId  String? @map("requesting_department_id")  // MAIN หรือ SUB
   usingDepartmentId       String? @map("using_department_id")
   buildingId              String? @map("building_id")
   floor                   String?
@@ -185,7 +185,7 @@ model StockTransaction {
     // OUT
     "requesterId": "uuid",            // หรือ
     "requesterName": "ชื่อที่พิมพ์",     // (ADMIN/STAFF เท่านั้น, USER ถูกบังคับเป็นตัวเอง)
-    "requestingDepartmentId": "uuid", // บังคับ, ต้องเป็น MAIN
+    "requestingDepartmentId": "uuid", // บังคับ, MAIN หรือ SUB
     "usingDepartmentId": "uuid",      // บังคับ
     "buildingId": "uuid", "floor": "3", "purpose": "Notebook นศพ",  // ไม่บังคับ
     "items": [

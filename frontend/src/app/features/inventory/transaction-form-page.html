@@ -59,17 +59,22 @@
       }
 
       <mat-form-field>
-        <mat-label>หน่วยงานที่เบิก (หน่วยงานหลัก)</mat-label>
+        <mat-label>หน่วยงานที่เบิก</mat-label>
         <input
           matInput
           formControlName="requestingDepartmentId"
           [matAutocomplete]="requestingAuto"
           (input)="requestingText.set(typed($event))"
-          placeholder="พิมพ์เพื่อค้นหา"
+          placeholder="หน่วยงานหลักหรือย่อย"
         />
         <mat-autocomplete #requestingAuto="matAutocomplete" [displayWith]="displayName" requireSelection (optionSelected)="requestingText.set('')">
           @for (d of requestingOptions(); track d.id) {
-            <mat-option [value]="d">{{ d.name }}</mat-option>
+            <mat-option [value]="d">
+              {{ d.name }}
+              @if (d.kind === 'MAIN') {
+                <span class="muted">(หลัก)</span>
+              }
+            </mat-option>
           }
         </mat-autocomplete>
         <mat-error>

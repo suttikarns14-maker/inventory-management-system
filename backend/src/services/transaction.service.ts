@@ -329,9 +329,7 @@ async function withdrawalHeader(user: SessionUser, input: CreateTransactionInput
     input.buildingId ? prisma.building.findUnique({ where: { id: input.buildingId } }) : null,
   ]);
   if (!input.requestingDepartmentId) errors.push({ field: 'requestingDepartmentId', message: 'กรุณาเลือกหน่วยงานที่เบิก' });
-  else if (!requesting?.isActive || requesting.kind !== 'MAIN') {
-    errors.push({ field: 'requestingDepartmentId', message: 'หน่วยงานที่เบิกต้องเป็นหน่วยงานหลัก' });
-  }
+  else if (!requesting?.isActive) errors.push({ field: 'requestingDepartmentId', message: 'ไม่พบหน่วยงานที่เลือก' });
   if (!input.usingDepartmentId) errors.push({ field: 'usingDepartmentId', message: 'กรุณาเลือกหน่วยงานที่ใช้' });
   else if (!using?.isActive) errors.push({ field: 'usingDepartmentId', message: 'ไม่พบหน่วยงานที่เลือก' });
   if (input.buildingId && !building?.isActive) errors.push({ field: 'buildingId', message: 'ไม่พบอาคารที่เลือก' });
@@ -410,9 +408,7 @@ export async function fillDepartments(admin: SessionUser, id: string, input: Fil
   const filled = 'รายการนี้มีหน่วยงานอยู่แล้ว แก้ไขไม่ได้';
   if (input.requestingDepartmentId) {
     if (txn.requestingDepartmentId) errors.push({ field: 'requestingDepartmentId', message: filled });
-    else if (!requesting?.isActive || requesting.kind !== 'MAIN') {
-      errors.push({ field: 'requestingDepartmentId', message: 'หน่วยงานที่เบิกต้องเป็นหน่วยงานหลัก' });
-    }
+    else if (!requesting?.isActive) errors.push({ field: 'requestingDepartmentId', message: 'ไม่พบหน่วยงานที่เลือก' });
   }
   if (input.usingDepartmentId) {
     if (txn.usingDepartmentId) errors.push({ field: 'usingDepartmentId', message: filled });

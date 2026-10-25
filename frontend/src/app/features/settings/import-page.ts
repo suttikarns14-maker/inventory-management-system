@@ -80,7 +80,7 @@ export class ImportPage {
     const p = this.preview();
     if (!p) return [];
     return [
-      { kind: 'requestingDepartments' as const, label: 'หน่วยงานที่เบิก', values: p.unmatched.requestingDepartments, options: p.options.mainDepartments },
+      { kind: 'requestingDepartments' as const, label: 'หน่วยงานที่เบิก', values: p.unmatched.requestingDepartments, options: p.options.allDepartments },
       { kind: 'usingDepartments' as const, label: 'หน่วยงานที่ใช้', values: p.unmatched.usingDepartments, options: p.options.allDepartments },
       { kind: 'buildings' as const, label: 'อาคาร', values: p.unmatched.buildings, options: p.options.buildings },
     ];

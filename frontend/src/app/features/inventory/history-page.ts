@@ -64,9 +64,7 @@ export class HistoryPage {
   );
 
   private readonly lookups = toSignal(inject(LookupService).all().pipe(catchError(() => of(null))));
-  protected readonly mainDepartments = computed(() =>
-    (this.lookups()?.departments ?? []).filter((d) => d.kind === 'MAIN'),
-  );
+  protected readonly departments = computed(() => this.lookups()?.departments ?? []);
 
   /** `?missingDepartment=true` comes from the dashboard's data-quality card. */
   protected readonly query = signal<HistoryQuery>({

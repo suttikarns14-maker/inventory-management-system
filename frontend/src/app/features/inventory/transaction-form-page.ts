@@ -115,7 +115,6 @@ export class TransactionFormPage {
 
   // ---- reference data ----
   private readonly lookups = toSignal(inject(LookupService).all());
-  protected readonly mainDepartments = computed(() => active(this.lookups()?.departments).filter((d) => d.kind === 'MAIN'));
   protected readonly allDepartments = computed(() => active(this.lookups()?.departments));
   protected readonly buildings = computed(() => active(this.lookups()?.buildings));
   protected readonly floors = computed(() => this.lookups()?.floors ?? []);
@@ -158,7 +157,7 @@ export class TransactionFormPage {
       .filter((u) => `${u.fullName} ${u.username}`.toLowerCase().includes(this.requesterText()))
       .slice(0, 30),
   );
-  protected readonly requestingOptions = computed(() => this.filterByName(this.mainDepartments(), this.requestingText()));
+  protected readonly requestingOptions = computed(() => this.filterByName(this.allDepartments(), this.requestingText()));
   protected readonly usingOptions = computed(() => this.filterByName(this.allDepartments(), this.usingText()));
   protected readonly displayUser = (u: UserOption | string | null) => (u && typeof u === 'object' ? u.fullName : (u ?? ''));
   protected readonly displayName = (d: LookupItem | string | null) => (d && typeof d === 'object' ? d.name : (d ?? ''));

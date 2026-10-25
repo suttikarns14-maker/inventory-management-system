@@ -35,11 +35,16 @@ const pickedOrEmpty = (c: AbstractControl): ValidationErrors | null =>
       <form [formGroup]="form" class="fields">
         @if (!data.txn.requestingDepartment) {
           <mat-form-field>
-            <mat-label>หน่วยงานที่เบิก (หน่วยงานหลัก)</mat-label>
+            <mat-label>หน่วยงานที่เบิก</mat-label>
             <input matInput formControlName="requestingDepartmentId" [matAutocomplete]="reqAuto" (input)="requestingText.set(typed($event))" placeholder="พิมพ์เพื่อค้นหา" />
             <mat-autocomplete #reqAuto="matAutocomplete" [displayWith]="displayName" requireSelection (optionSelected)="requestingText.set('')">
               @for (d of requestingOptions(); track d.id) {
-                <mat-option [value]="d">{{ d.name }}</mat-option>
+                <mat-option [value]="d">
+                  {{ d.name }}
+                  @if (d.kind === 'MAIN') {
+                    <span class="muted">(หลัก)</span>
+                  }
+                </mat-option>
               }
             </mat-autocomplete>
             <mat-error>
@@ -103,9 +108,7 @@ export class FillDepartmentsDialog {
   protected readonly usingText = signal('');
   protected readonly typed = (e: Event) => (e.target as HTMLInputElement).value.trim().toLowerCase();
   private readonly active = this.data.departments.filter((d) => d.isActive);
-  protected readonly requestingOptions = computed(() =>
-    this.filter(this.active.filter((d) => d.kind === 'MAIN'), this.requestingText()),
-  );
+  protected readonly requestingOptions = computed(() => this.filter(this.active, this.requestingText()));
   protected readonly usingOptions = computed(() => this.filter(this.active, this.usingText()));
   protected readonly displayName = (d: Department | string | null) => (d && typeof d === 'object' ? d.name : (d ?? ''));
 
