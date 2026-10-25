@@ -93,6 +93,14 @@ describe('materials', () => {
     expect(res.body.data[0].category).toEqual({ id: fx.category.id, name: 'วัสดุสำนักงาน' });
   });
 
+  it('filters out-of-stock materials (currentQuantity = 0)', async () => {
+    const agent = await loginAs('user');
+    expect((await agent.get('/api/v1/materials?outOfStock=true')).body.data).toEqual([]);
+    await prisma.material.update({ where: { code: 'OFF-002' }, data: { currentQuantity: 0 } });
+    const res = await agent.get('/api/v1/materials?outOfStock=true');
+    expect(res.body.data.map((m: { code: string }) => m.code)).toEqual(['OFF-002']);
+  });
+
   it('searches, sorts and pages', async () => {
     const agent = await loginAs('user');
     const byName = await agent.get('/api/v1/materials?search=ปาก');

@@ -28,6 +28,7 @@ export async function listMaterials(q: z.infer<typeof listMaterialsSchema>) {
     ...(q.trackingType && { trackingType: q.trackingType }),
     // Low stock = currentQuantity <= minStock: a column-to-column comparison (field reference).
     ...(q.lowStock && { currentQuantity: { lte: prisma.material.fields.minStock } }),
+    ...(q.outOfStock && { currentQuantity: 0 }),
     ...(q.search && {
       OR: [
         { code: { contains: q.search, mode: 'insensitive' } },
