@@ -67,6 +67,7 @@ export const listMaterialsSchema = pageQuery.extend({
   categoryId: z.string().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE']).default('ACTIVE'),
   lowStock: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+  outOfStock: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
   storageLocationId: z.string().optional(),
   trackingType: z.enum(['QUANTITY', 'SERIAL']).optional(),
   sortBy: z.enum(['code', 'name', 'currentQuantity', 'updatedAt']).default('code'),

@@ -66,11 +66,14 @@ export class HistoryPage {
   private readonly lookups = toSignal(inject(LookupService).all().pipe(catchError(() => of(null))));
   protected readonly departments = computed(() => this.lookups()?.departments ?? []);
 
-  /** `?missingDepartment=true` comes from the dashboard's data-quality card. */
+  /** Filters the dashboard links to: `?missingDepartment=true`, `?type=OUT&from=YYYY-MM-DD`. */
+  private readonly params = inject(ActivatedRoute).snapshot.queryParamMap;
   protected readonly query = signal<HistoryQuery>({
     page: 1,
     limit: 20,
-    missingDepartment: inject(ActivatedRoute).snapshot.queryParamMap.get('missingDepartment') === 'true' || undefined,
+    missingDepartment: this.params.get('missingDepartment') === 'true' || undefined,
+    type: (['IN', 'OUT'] as const).find((t) => t === this.params.get('type')),
+    from: this.params.get('from') ?? undefined,
   });
   private serialTimer?: ReturnType<typeof setTimeout>;
   protected readonly result = signal<Page<StockTransaction> | null>(null);

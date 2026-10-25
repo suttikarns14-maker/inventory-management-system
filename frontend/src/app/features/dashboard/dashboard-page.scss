@@ -13,6 +13,18 @@
   border-radius: 12px;
   border: 1px solid var(--mat-sys-outline-variant);
   background: var(--mat-sys-surface-container-lowest);
+  // Every card opens its list: reset link/button styles.
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+
+  &:hover,
+  &:focus-visible {
+    box-shadow: var(--mat-sys-level2);
+  }
 }
 
 .kpi-label {

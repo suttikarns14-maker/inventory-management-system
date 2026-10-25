@@ -59,6 +59,12 @@ export class DashboardPage {
     return Math.max(1, ...(this.top() ?? []).map((t) => t[key]));
   });
 
+  /** First day of this month (local date), for the "withdrawals this month" card's link. */
+  protected readonly monthStart = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  })();
+
   // ---- unused ----
   /** null = never withdrawn at all. */
   protected readonly unusedDays = signal<number | null>(null);

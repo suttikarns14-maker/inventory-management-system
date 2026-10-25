@@ -67,6 +67,7 @@ export interface MaterialQuery {
   storageLocationId?: string;
   trackingType?: TrackingType;
   lowStock?: boolean;
+  outOfStock?: boolean;
   sortBy?: MaterialSortBy;
   sortOrder?: SortOrder;
   page?: number;

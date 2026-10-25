@@ -4,26 +4,26 @@
 
 @let s = summary();
 <div class="kpis">
-  <div class="kpi">
+  <a class="kpi" routerLink="/materials">
     <span class="kpi-label">วัสดุที่ใช้งานอยู่</span>
     <span class="kpi-value">{{ s?.activeMaterials ?? '-' }}</span>
-  </div>
-  <div class="kpi" [class.kpi-danger]="(s?.reorderCount ?? 0) > 0">
+  </a>
+  <button type="button" class="kpi" [class.kpi-danger]="(s?.reorderCount ?? 0) > 0" (click)="reorderCard.scrollIntoView({ behavior: 'smooth' })">
     <span class="kpi-label">ต้องสั่งซื้อ</span>
     <span class="kpi-value">{{ s?.reorderCount ?? '-' }}</span>
-  </div>
-  <div class="kpi" [class.kpi-danger]="(s?.outOfStockCount ?? 0) > 0">
+  </button>
+  <a class="kpi" [class.kpi-danger]="(s?.outOfStockCount ?? 0) > 0" routerLink="/materials" [queryParams]="{ outOfStock: true }">
     <span class="kpi-label">หมดสต็อก</span>
     <span class="kpi-value">{{ s?.outOfStockCount ?? '-' }}</span>
-  </div>
-  <div class="kpi">
+  </a>
+  <button type="button" class="kpi" (click)="unusedDays.set(null); unusedCard.scrollIntoView({ behavior: 'smooth' })">
     <span class="kpi-label">ไม่เคยถูกเบิก</span>
     <span class="kpi-value">{{ s?.neverWithdrawnCount ?? '-' }}</span>
-  </div>
-  <div class="kpi">
+  </button>
+  <a class="kpi" routerLink="/inventory/history" [queryParams]="{ type: 'OUT', from: monthStart }">
     <span class="kpi-label">รายการเบิกเดือนนี้</span>
     <span class="kpi-value">{{ s?.withdrawalsThisMonth ?? '-' }}</span>
-  </div>
+  </a>
 </div>
 
 <div class="two-col spaced">
@@ -82,7 +82,7 @@
   </section>
 </div>
 
-<section class="card">
+<section class="card" #reorderCard>
   <h2>ควรสั่งซื้อ{{ reorder()?.length ? ' (' + reorder()!.length + ' รายการ)' : '' }}</h2>
   <p class="muted hint">
     เรียงตามความเร่งด่วน · อัตราการใช้คิดจากการเบิก 90 วันล่าสุด · จำนวนแนะนำให้พอใช้ 30 วัน
@@ -181,7 +181,7 @@
     </ol>
   </section>
 
-  <section class="card">
+  <section class="card" #unusedCard>
     <div class="card-head">
       <h2>
         วัสดุที่ไม่ถูกเบิกใช้{{ unused()?.length ? ' (' + unused()!.length + ')' : '' }}

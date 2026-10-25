@@ -49,6 +49,13 @@
       เฉพาะสต็อกต่ำ
     </mat-checkbox>
 
+    <mat-checkbox
+      [checked]="!!query().outOfStock"
+      (change)="update({ outOfStock: $event.checked || undefined })"
+    >
+      เฉพาะของหมด
+    </mat-checkbox>
+
     <button mat-button (click)="clearFilters()">ล้างตัวกรอง</button>
   </div>
 
