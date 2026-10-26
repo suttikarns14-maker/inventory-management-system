@@ -23,11 +23,6 @@ enum TransactionType {
   OUT
 }
 
-enum MaterialStatus {
-  ACTIVE
-  INACTIVE
-}
-
 /// Spec v2.2 D9: total count only, or one row per serial number.
 enum TrackingType {
   QUANTITY
@@ -88,14 +83,12 @@ model Material {
   trackingType      TrackingType           @default(QUANTITY) @map("tracking_type")
   storageLocationId String?                @map("storage_location_id")
   storageLocation   StorageLocation?       @relation(fields: [storageLocationId], references: [id])
-  status            MaterialStatus         @default(ACTIVE)
   createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
   transactionItems  StockTransactionItem[]
   units             MaterialUnit[]
 
   @@index([categoryId])
-  @@index([status])
   @@map("materials")
 }
 

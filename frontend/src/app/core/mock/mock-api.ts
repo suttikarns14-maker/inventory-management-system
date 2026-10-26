@@ -1,6 +1,6 @@
 import { ErrorCode, FieldError, PageMeta } from '../../shared/models/api';
 import { Role, User, USERNAME_PATTERN } from '../../shared/models/user';
-import { Category, Material, MaterialStatus } from '../../shared/models/material';
+import { Category, Material } from '../../shared/models/material';
 import { StockTransaction, TransactionType } from '../../shared/models/transaction';
 import {
   DashboardSummary,
@@ -10,7 +10,7 @@ import {
 } from '../../shared/models/dashboard';
 import { bangkokDate, bangkokDayStart, DAY_MS } from '../../shared/utils/date';
 import { FLOORS } from '../../shared/models/lookup';
-import { DepartmentRow, LookupRow, MaterialRow, MockStore, TransactionRow, UserRow } from './mock-db';
+import { DepartmentRow, LookupRow, MaterialRow, MaterialStatus, MockStore, TransactionRow, UserRow } from './mock-db';
 
 // In-browser stand-in for the Part 2 back-end. It follows spec §4 (routes, roles, error codes,
 // response envelope) so the Angular app cannot tell the difference. Business logic here only
@@ -395,7 +395,7 @@ export class MockApi {
     if (categoryId && !this.db.categories.some((x) => x.id === categoryId)) {
       v.errors.push({ field: 'categoryId', message: 'ไม่พบหมวดหมู่ที่เลือก' });
     }
-    const status = existing ? v.oneOf('status', 'สถานะ', ['ACTIVE', 'INACTIVE'] as const) : 'ACTIVE';
+    const status = existing?.status ?? 'ACTIVE';
     v.check();
     if (this.db.materials.some((m) => m.id !== id && m.code.toLowerCase() === code!.toLowerCase())) {
       throw new MockError(409, 'DUPLICATE_CODE', 'รหัสวัสดุนี้มีอยู่แล้ว', [{ field: 'code', message: 'รหัสวัสดุนี้มีอยู่แล้ว' }]);
@@ -538,8 +538,6 @@ export class MockApi {
   ): TransactionRow {
     const materials = items.map((i) => this.material(i.materialId));
     for (const [i, m] of materials.entries()) {
-      // A reversal must always be possible, even if the material was switched off since.
-      if (m.status !== 'ACTIVE' && !reversalOfId) throw new MockError(400, 'MATERIAL_INACTIVE', `วัสดุ "${m.name}" ถูกปิดใช้งาน`);
       if (type === 'OUT' && m.currentQuantity < items[i].quantity) {
         throw new MockError(
           400,
@@ -698,7 +696,7 @@ export class MockApi {
       .filter((cat) => active.some((m) => m.categoryId === cat.id))
       .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
     const data: DashboardSummary = {
-      activeMaterials: active.length,
+      totalMaterials: active.length,
       reorderCount: this.reorder().length,
       outOfStockCount: active.filter((m) => m.currentQuantity === 0).length,
       neverWithdrawnCount: active.filter((m) => !lastOut.has(m.id)).length,

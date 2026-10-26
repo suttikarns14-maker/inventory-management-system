@@ -11,7 +11,6 @@ import { Router, RouterLink } from '@angular/router';
 import {
   Material,
   MaterialInput,
-  MaterialStatus,
   TRACKING_LABELS,
   TrackingType,
 } from '../../shared/models/material';
@@ -117,15 +116,6 @@ import { MaterialService } from './material.service';
         </mat-form-field>
 
         @if (id()) {
-          <mat-form-field>
-            <mat-label>สถานะ</mat-label>
-            <mat-select formControlName="status">
-              <mat-option value="ACTIVE">ใช้งาน</mat-option>
-              <mat-option value="INACTIVE">ปิดใช้งาน</mat-option>
-            </mat-select>
-            <mat-hint>วัสดุที่ปิดใช้งานจะรับเข้าหรือเบิกจ่ายไม่ได้</mat-hint>
-          </mat-form-field>
-
           @if (material(); as m) {
             <div class="stock-note span-all muted">
               <mat-icon>info</mat-icon>
@@ -183,7 +173,6 @@ export class MaterialFormPage implements OnInit {
     model: [''],
     storageLocationId: [''],
     trackingType: ['QUANTITY' as TrackingType],
-    status: ['ACTIVE' as MaterialStatus],
   });
 
   ngOnInit(): void {
@@ -225,7 +214,6 @@ export class MaterialFormPage implements OnInit {
       model: v.model.trim() || null,
       trackingType: v.trackingType,
       storageLocationId: v.storageLocationId || null,
-      ...(id ? { status: v.status } : {}),
     };
     this.saving.set(true);
     (id ? this.materials.update(id, input) : this.materials.create(input)).subscribe({

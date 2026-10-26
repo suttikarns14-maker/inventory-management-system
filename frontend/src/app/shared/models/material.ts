@@ -1,6 +1,5 @@
 import { SortOrder } from './api';
 
-export type MaterialStatus = 'ACTIVE' | 'INACTIVE';
 
 /** Spec v2.2 D9: total count only, or one unit per serial number. */
 export type TrackingType = 'QUANTITY' | 'SERIAL';
@@ -37,7 +36,6 @@ export interface Material {
   unit: string;
   currentQuantity: number;
   minStock: number;
-  status: MaterialStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,8 +52,6 @@ export interface MaterialInput {
   /** Cannot change once the material has movements (server checks). */
   trackingType: TrackingType;
   storageLocationId: string | null;
-  /** ADMIN only (PUT). */
-  status?: MaterialStatus;
 }
 
 export type MaterialSortBy = 'code' | 'name' | 'currentQuantity' | 'updatedAt';
@@ -63,7 +59,6 @@ export type MaterialSortBy = 'code' | 'name' | 'currentQuantity' | 'updatedAt';
 export interface MaterialQuery {
   search?: string;
   categoryId?: string;
-  status?: MaterialStatus;
   storageLocationId?: string;
   trackingType?: TrackingType;
   lowStock?: boolean;

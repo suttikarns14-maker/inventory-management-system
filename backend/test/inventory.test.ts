@@ -93,13 +93,6 @@ describe('stock transactions (spec §5)', () => {
     expect(dup.body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('refuses inactive materials', async () => {
-    await prisma.material.update({ where: { id: fx.paper.id }, data: { status: 'INACTIVE' } });
-    const agent = await loginAs('staff');
-    const res = await agent.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 1));
-    expect(res.body.error.code).toBe('MATERIAL_INACTIVE');
-  });
-
   it('has a database CHECK as the last line of defence against negative stock', async () => {
     await expect(
       prisma.material.update({ where: { id: fx.pens.id }, data: { currentQuantity: -1 } }),

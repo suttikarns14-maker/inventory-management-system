@@ -47,7 +47,7 @@ Layered architecture: `routes → middlewares → controllers → services → P
 
 ## Domain model
 
-`User` (`username` ใช้ login ไม่ใช่ email · ไม่สนตัวพิมพ์เล็กใหญ่ · role: ADMIN | STAFF | USER, `isActive`), `Department` (MAIN/SUB), `Building`, `StorageLocation` (ปิดใช้งานแทนการลบ), `MaterialUnit` (S/N ของวัสดุ `SERIAL`, status IN_STOCK/ISSUED/VOID, `isTempSerial`), `TransactionUnit` (S/N ไหนอยู่ในรายการไหน + remark), `Category`, `Material` (code unique, `currentQuantity`, `minStock`, `location`, `status` enum ACTIVE/INACTIVE), `StockTransaction` (type IN/OUT, `referenceNo` unique เช่น `TXN-20260927-001`, `reversalOfId` ใช้ยกเลิกรายการ), `StockTransactionItem` (quantity, `unitPrice` Decimal(10,2) ใช้เฉพาะ IN), `ReferenceCounter` (ตัวนับเลขอ้างอิงรายวัน) ดู schema เต็มในสเปก §3
+`User` (`username` ใช้ login ไม่ใช่ email · ไม่สนตัวพิมพ์เล็กใหญ่ · role: ADMIN | STAFF | USER, `isActive`), `Department` (MAIN/SUB), `Building`, `StorageLocation` (ปิดใช้งานแทนการลบ), `MaterialUnit` (S/N ของวัสดุ `SERIAL`, status IN_STOCK/ISSUED/VOID, `isTempSerial`), `TransactionUnit` (S/N ไหนอยู่ในรายการไหน + remark), `Category`, `Material` (code unique, `currentQuantity`, `minStock`, `location` · ไม่มีสถานะเปิด/ปิดใช้งาน (D16)), `StockTransaction` (type IN/OUT, `referenceNo` unique เช่น `TXN-20260927-001`, `reversalOfId` ใช้ยกเลิกรายการ), `StockTransactionItem` (quantity, `unitPrice` Decimal(10,2) ใช้เฉพาะ IN), `ReferenceCounter` (ตัวนับเลขอ้างอิงรายวัน) ดู schema เต็มในสเปก §3
 
 ## Roles
 
@@ -83,7 +83,7 @@ DB ใช้ snake_case (`@map`) ส่วนโค้ดใช้ camelCase
 - **OUT ต้องหักแบบมีเงื่อนไข** (`updateMany where currentQuantity >= qty` แล้วเช็ก `count`) ห้ามอ่านยอดก่อนแล้วค่อย `increment` เพราะเกิด race condition ได้ และ DB มี `CHECK (current_quantity >= 0)` เป็นด่านสุดท้าย
 - `quantity` ต้องเป็นจำนวนเต็มบวก และห้ามมีวัสดุซ้ำในรายการเดียว
 - **ห้ามลบหรือแก้รายการรับ-จ่ายเดิม** ให้แก้ด้วยรายการกลับ (reversal) โดย ADMIN เท่านั้น · ข้อยกเว้นเดียว (D14): ADMIN เติมหน่วยงานที่เบิก/ที่ใช้ของรายการเบิกได้ **เฉพาะช่องที่ยังว่าง** (`PATCH /inventory/transactions/:id/departments`) ไม่กระทบยอดสต็อก
-- วัสดุ `INACTIVE` ทำรายการไม่ได้ และไม่นับใน dashboard ส่วน dashboard ไม่นับรายการที่ถูกยกเลิกแล้ว
+- dashboard ไม่นับรายการที่ถูกยกเลิกแล้ว · วัสดุไม่มีการปิดใช้งาน (D16: เลิกใช้ ACTIVE/INACTIVE ตั้งแต่ 2026-10-26)
 - ผู้ใช้ห้ามลบ ใช้ `isActive = false` แทน
 - **วัสดุ `SERIAL`:** `currentQuantity` = จำนวน `MaterialUnit` ที่ `IN_STOCK` เสมอ อัปเดตใน DB transaction เดียวกัน · เปลี่ยนสถานะชิ้นแบบมีเงื่อนไข (`updateMany where status = ...` แล้วเช็ก `count`) · S/N ไม่ซ้ำแบบไม่สนตัวพิมพ์ (`DUPLICATE_SERIAL`) · เปลี่ยน `trackingType` ไม่ได้หลังมีรายการ
 - **เบิก (OUT):** ต้องมีหน่วยงานที่เบิกและหน่วยงานที่ใช้ (ทั้งสองช่องเลือกได้ทั้ง MAIN และ SUB ตั้งแต่ 2026-10-25) · USER เป็นผู้เบิกเอง ส่วน ADMIN/STAFF เลือกผู้ใช้หรือพิมพ์ชื่อ (`requesterName` เก็บเสมอ)

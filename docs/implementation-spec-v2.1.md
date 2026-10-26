@@ -36,7 +36,7 @@
 | Login / Logout / ดูข้อมูลตัวเอง | ✅ | ✅ | ✅ |
 | ดูและค้นหารายการวัสดุ | ✅ | ✅ | ✅ |
 | **เพิ่ม**วัสดุ | ✅ | ✅ | ❌ |
-| **แก้ไข**วัสดุ (รวมถึงเปิด/ปิดใช้งาน) | ✅ | ❌ | ❌ |
+| **แก้ไข**วัสดุ | ✅ | ❌ | ❌ |
 | ดูหมวดหมู่ | ✅ | ✅ | ✅ |
 | เพิ่ม/แก้ไขหมวดหมู่ | ✅ | ❌ | ❌ |
 | บันทึก**รับเข้า** (IN) | ✅ | ✅ | ❌ |
@@ -78,7 +78,7 @@
 **✏️ US-1.1 เพิ่มและจัดการรายการวัสดุ**
 - **ทุก role:** ดู ค้นหา (จาก `code` และ `name` ไม่สนตัวพิมพ์เล็กใหญ่) กรองตามหมวดหมู่หรือสต็อกต่ำ เรียงลำดับ และแบ่งหน้า
 - **ADMIN, STAFF:** เพิ่มวัสดุได้ `code` ห้ามซ้ำ ถ้าซ้ำตอบ 409 `DUPLICATE_CODE`
-- **ADMIN:** แก้ไขวัสดุ และเปิด/ปิดใช้งาน (`ACTIVE` / `INACTIVE`) ได้
+- **ADMIN:** แก้ไขวัสดุได้ · **ไม่มีการปิดใช้งานวัสดุแล้ว** (D16 (2026-10-26) เลิกใช้ `ACTIVE` / `INACTIVE` เพราะผู้ใช้สับสน) วัสดุที่ผิดหรือซ้ำให้แก้ชื่อหรือรหัสแทน
 - **ห้าม**กำหนดหรือแก้ `currentQuantity` ในฟอร์มวัสดุ ยอดเริ่มต้นต้องบันทึกผ่านรายการรับเข้า (IN) เพื่อให้มีประวัติ
 - Validation: `code`, `name`, `unit` ห้ามว่าง, `categoryId` ต้องมีอยู่จริง, `minStock` เป็นจำนวนเต็ม `>= 0`
 - Badge **สีแดง "เตือนสต็อกต่ำ"** เมื่อ `currentQuantity <= minStock` นอกนั้นเป็นสีเขียว
@@ -91,7 +91,6 @@
 **✏️ US-2.1 รับเข้าและเบิกจ่ายพร้อมตัดสต็อกอัตโนมัติ**
 - **IN:** ADMIN, STAFF · **OUT:** ทุก role โดย USER จะเห็นเฉพาะโหมดเบิกจ่าย
 - เพิ่มวัสดุได้หลายรายการในครั้งเดียว วัสดุหนึ่งตัวมีได้บรรทัดเดียว และจำนวนต้องเป็นจำนวนเต็มบวก
-- ทำรายการกับวัสดุ `INACTIVE` ไม่ได้
 - **Front-end:** โหมด OUT ถ้าจำนวน > ยอดคงเหลือ ให้แสดงข้อความเตือนสีแดงใต้ช่อง และปิดปุ่ม "ยืนยันรายการ"
 - **Back-end:** ตรวจซ้ำเสมอ ถ้าไม่พอตอบ 400 `INSUFFICIENT_STOCK` พร้อมชื่อวัสดุ และ rollback ทั้งรายการ
 - สำเร็จแล้วแสดง toast พร้อมเลขอ้างอิง (`TXN-YYYYMMDD-NNN`) และ reset ฟอร์ม
@@ -108,11 +107,11 @@
 **✏️ US-3.1 Dashboard ช่วยตัดสินใจสั่งซื้อ** (ADMIN, STAFF)
 > **As a** ผู้บริหารคลังหรือหัวหน้างาน **I want to** เห็นว่าวัสดุตัวไหนต้องสั่งซื้อ ตัวไหนใช้มากที่สุด และตัวไหนไม่เคยถูกใช้ **So that** วางแผนสั่งซื้อได้ทันเวลาและไม่ซื้อของที่ไม่ได้ใช้มาเก็บไว้
 
-- **KPI cards:** วัสดุที่ใช้งานอยู่, ต้องสั่งซื้อ, หมดสต็อก, ไม่เคยเบิก และจำนวนครั้งที่เบิกในเดือนนี้
+- **KPI cards:** วัสดุทั้งหมด, ต้องสั่งซื้อ, หมดสต็อก, ไม่เคยเบิก และจำนวนครั้งที่เบิกในเดือนนี้
 - **ตาราง "ควรสั่งซื้อ"** เรียงตามความเร่งด่วน แสดงยอดคงเหลือ, จุดสั่งซื้อ, อัตราการใช้ต่อวัน, จำนวนวันที่เหลือโดยประมาณ และ**จำนวนแนะนำให้สั่ง** (สูตรใน §6)
 - **อันดับวัสดุที่เบิกมากที่สุด** (Top 10) เลือกช่วงเวลาได้ (30 / 90 / 365 วัน) และสลับการเรียงระหว่าง "จำนวนที่เบิก" กับ "จำนวนครั้งที่เบิก" ได้
 - **วัสดุที่ไม่เคยเบิก**: เลือกได้ระหว่าง "ไม่เคยเบิกเลย" หรือ "ไม่ได้เบิกเกิน N วัน" แสดงยอดคงค้างและวันที่เบิกล่าสุด
-- ไม่นับรายการที่ถูกยกเลิกแล้ว และไม่นับวัสดุ `INACTIVE`
+- ไม่นับรายการที่ถูกยกเลิกแล้ว
 - ~~มูลค่าคลังรวม~~: ตัดออกจากขอบเขต
 
 ---
@@ -138,11 +137,6 @@ enum Role {
 enum TransactionType {
   IN
   OUT
-}
-
-enum MaterialStatus {
-  ACTIVE
-  INACTIVE
 }
 
 model User {
@@ -180,7 +174,6 @@ model Material {
   currentQuantity  Int                    @default(0) @map("current_quantity")
   minStock         Int                    @default(0) @map("min_stock")
   location         String?
-  status           MaterialStatus         @default(ACTIVE)
   createdAt        DateTime               @default(now()) @map("created_at")
   updatedAt        DateTime               @updatedAt @map("updated_at")
   transactionItems StockTransactionItem[]
@@ -308,7 +301,6 @@ export class AppError extends Error {
 |---|---|---|
 | `VALIDATION_ERROR` | 400 | input ไม่ผ่าน Zod |
 | `INSUFFICIENT_STOCK` | 400 | เบิกเกินยอดคงเหลือ หรือยกเลิก IN แล้วทำให้ยอดติดลบ |
-| `MATERIAL_INACTIVE` | 400 | ทำรายการกับวัสดุที่ปิดใช้งาน |
 | `INVALID_CREDENTIALS` | 401 | username หรือรหัสผ่านผิด |
 | `UNAUTHORIZED` | 401 | ไม่มี token, token ไม่ถูกต้อง หรือหมดอายุ |
 | `USER_INACTIVE` | 403 | บัญชีถูกปิด |
@@ -333,7 +325,7 @@ export class AppError extends Error {
 | **Categories** | GET | `/categories` | ทุก role | ไม่แบ่งหน้า |
 | | POST | `/categories` | ADMIN | 201 |
 | | PUT | `/categories/:id` | ADMIN | |
-| **Materials** | GET | `/materials` | ทุก role | `search`, `categoryId`, `status` (ค่าเริ่มต้น `ACTIVE`), `lowStock=true`, `sortBy` (`code`\|`name`\|`currentQuantity`\|`updatedAt`), `sortOrder`, `page`, `limit` |
+| **Materials** | GET | `/materials` | ทุก role | `search`, `categoryId`, `lowStock=true`, `sortBy` (`code`\|`name`\|`currentQuantity`\|`updatedAt`), `sortOrder`, `page`, `limit` |
 | | GET | `/materials/:id` | ทุก role | |
 | | POST | `/materials` | ADMIN, STAFF | 201 · ไม่รับ `currentQuantity` |
 | | PUT | `/materials/:id` | ADMIN | ไม่รับ `currentQuantity` · แก้ `code` ได้ถ้าไม่ซ้ำ (D6) โดยประวัติอ้างถึงวัสดุด้วย `id` จึงไม่กระทบ แต่จะแสดงรหัสใหม่ |
@@ -411,9 +403,6 @@ export class TransactionService {
       for (const item of items) {
         const m = byId.get(item.materialId);
         if (!m) throw new AppError(404, 'NOT_FOUND', 'ไม่พบวัสดุบางรายการ');
-        if (m.status !== 'ACTIVE') {
-          throw new AppError(400, 'MATERIAL_INACTIVE', `วัสดุ "${m.name}" ถูกปิดใช้งาน`);
-        }
       }
 
       for (const item of items) {
@@ -526,7 +515,7 @@ AND NOT EXISTS (SELECT 1 FROM stock_transactions r WHERE r.reversal_of_id = t.id
 ### 6.1 `GET /dashboard/summary`
 | Field | ความหมาย |
 |---|---|
-| `activeMaterials` | จำนวนวัสดุ `ACTIVE` |
+| `totalMaterials` | จำนวนวัสดุทั้งหมด |
 | `reorderCount` | จำนวนวัสดุในตาราง "ควรสั่งซื้อ" (§6.2) |
 | `outOfStockCount` | `ACTIVE` และ `currentQuantity = 0` |
 | `neverWithdrawnCount` | `ACTIVE` และไม่เคยมีรายการ OUT |
@@ -569,7 +558,6 @@ FROM stock_transaction_items i
 JOIN stock_transactions t ON t.id = i.transaction_id
 JOIN materials m          ON m.id = i.material_id
 WHERE t.type = 'OUT' AND t.created_at >= $from AND t.created_at < $to
-  AND m.status = 'ACTIVE'
   AND <exclude reversed>
 GROUP BY m.id
 ORDER BY <total_quantity | withdrawal_count> DESC
@@ -589,20 +577,19 @@ LEFT JOIN LATERAL (
   JOIN stock_transactions t ON t.id = i.transaction_id
   WHERE i.material_id = m.id AND t.type = 'OUT' AND <exclude reversed>
 ) lo ON true
-WHERE m.status = 'ACTIVE'
-  AND (lo.last_out_at IS NULL OR ($days::int IS NOT NULL AND lo.last_out_at < now() - make_interval(days => $days::int)))
+WHERE (lo.last_out_at IS NULL OR ($days::int IS NOT NULL AND lo.last_out_at < now() - make_interval(days => $days::int)))
 ORDER BY lo.last_out_at NULLS FIRST, m.current_quantity DESC;
 ```
 
 ### 6.5 `GET /dashboard/procurement` (จัดซื้อตามปีงบ / อายุสต็อก)
 
-1 แถวต่อ ปีงบ + ชื่อโครงการ (TOR) จากใบรับเข้า (IN) ที่ไม่ถูกยกเลิก เรียงปีงบใหม่ไปเก่า · **นับเป็นรายชิ้น** (`transaction_units` → `material_units`) จึงใช้ได้กับวัสดุ `SERIAL` เท่านั้น (ทุกวัสดุเป็น SERIAL ตาม D15) · มูลค่าของแต่ละชิ้นใช้ราคาในบรรทัดใบรับเข้าของชิ้นนั้น (ไม่ใช่ราคาล่าสุด) ชิ้นที่ไม่มีราคานับเป็น 0 · ใบรับเข้าที่ไม่ได้ระบุปีงบใช้ปีงบตามวันที่ (เริ่ม 1 ต.ค.) · ไม่นับวัสดุ INACTIVE
+1 แถวต่อ ปีงบ + ชื่อโครงการ (TOR) จากใบรับเข้า (IN) ที่ไม่ถูกยกเลิก เรียงปีงบใหม่ไปเก่า · **นับเป็นรายชิ้น** (`transaction_units` → `material_units`) จึงใช้ได้กับวัสดุ `SERIAL` เท่านั้น (ทุกวัสดุเป็น SERIAL ตาม D15) · มูลค่าของแต่ละชิ้นใช้ราคาในบรรทัดใบรับเข้าของชิ้นนั้น (ไม่ใช่ราคาล่าสุด) ชิ้นที่ไม่มีราคานับเป็น 0 · ใบรับเข้าที่ไม่ได้ระบุปีงบใช้ปีงบตามวันที่ (เริ่ม 1 ต.ค.)
 
 Response: `ProcurementRow[]` = `{ fiscalYear, projectName, receivedQty, receivedValue, unpricedQty, remainingQty, remainingValue }` โดย `remaining*` คือชิ้นที่ยัง `IN_STOCK`
 
 ### 6.6 `GET /dashboard/monthly-withdrawals` (แนวโน้มการเบิกรายเดือน)
 
-12 เดือนล่าสุดตามเวลาไทย (เก่าไปใหม่) จำนวนชิ้นที่เบิกจริง (ไม่นับรายการที่ยกเลิก และวัสดุ INACTIVE) เทียบกับเดือนเดียวกันของปีก่อน
+12 เดือนล่าสุดตามเวลาไทย (เก่าไปใหม่) จำนวนชิ้นที่เบิกจริง (ไม่นับรายการที่ยกเลิก) เทียบกับเดือนเดียวกันของปีก่อน
 
 Response: `MonthlyWithdrawals[]` = `{ month: "YYYY-MM", quantity, previousYearQuantity }`
 
@@ -791,7 +778,7 @@ export const routes: Routes = [
 
 - `FormGroup { type, note, items: FormArray<FormGroup{ material, quantity, unitPrice }> }`
 - **Toggle IN/OUT** แสดงเฉพาะ ADMIN และ STAFF ส่วน USER ถูกกำหนดเป็น `OUT` ตายตัว
-- **ค้นหาวัสดุ:** `mat-autocomplete` + `valueChanges.pipe(debounceTime(300), distinctUntilChanged(), switchMap(...))` เรียก `GET /materials?search=&status=ACTIVE&limit=10`
+- **ค้นหาวัสดุ:** `mat-autocomplete` + `valueChanges.pipe(debounceTime(300), distinctUntilChanged(), switchMap(...))` เรียก `GET /materials?search=&limit=10`
 - ถ้าเลือกวัสดุที่อยู่ในรายการแล้ว **ให้ focus ที่บรรทัดเดิม** แทนการเพิ่มบรรทัดใหม่
 - ตอนเลือกวัสดุให้เก็บ `currentQuantity` ล่าสุดจากผลค้นหาไว้ในบรรทัดนั้น
 - **Validators ของ `quantity`:** `required`, `min(1)`, `pattern(/^\d+$/)` และในโหมด OUT มี validator `maxStock` ที่เทียบกับ `currentQuantity` ของบรรทัด โดยต้องเรียก `updateValueAndValidity()` ทุกบรรทัดเมื่อสลับ IN/OUT

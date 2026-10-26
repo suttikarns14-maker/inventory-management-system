@@ -121,16 +121,12 @@ export async function applyTransaction(
   const run = async (tx: Tx) => {
     const materials = await tx.material.findMany({
       where: { id: { in: items.map((i) => i.materialId) } },
-      select: { id: true, code: true, name: true, unit: true, status: true, trackingType: true, storageLocationId: true },
+      select: { id: true, code: true, name: true, unit: true, trackingType: true, storageLocationId: true },
     });
     const byId = new Map(materials.map((m) => [m.id, m]));
     for (const item of items) {
       const m = byId.get(item.materialId);
       if (!m) throw notFound('ไม่พบวัสดุบางรายการ');
-      // A reversal must always be possible, even if the material was switched off since.
-      if (m.status !== 'ACTIVE' && !reversalOfId) {
-        throw new AppError(400, 'MATERIAL_INACTIVE', `วัสดุ "${m.name}" ถูกปิดใช้งาน`);
-      }
     }
 
     const newUnits: {

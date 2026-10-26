@@ -22,7 +22,6 @@ export function materialKey(name: string, brand?: string | null, model?: string 
 
 export async function listMaterials(q: z.infer<typeof listMaterialsSchema>) {
   const where: Prisma.MaterialWhereInput = {
-    status: q.status,
     ...(q.categoryId && { categoryId: q.categoryId }),
     ...(q.storageLocationId && { storageLocationId: q.storageLocationId }),
     ...(q.trackingType && { trackingType: q.trackingType }),

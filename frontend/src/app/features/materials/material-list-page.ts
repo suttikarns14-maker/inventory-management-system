@@ -15,7 +15,7 @@ import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { catchError, debounceTime, distinctUntilChanged, map, of, switchMap, tap } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { Page } from '../../shared/models/api';
-import { Material, MaterialQuery, MaterialSortBy, MaterialStatus } from '../../shared/models/material';
+import { Material, MaterialQuery, MaterialSortBy } from '../../shared/models/material';
 import { CategoryService } from '../../shared/services/category.service';
 import { Notify } from '../../shared/services/notify';
 import { StockBadge } from '../../shared/components/stock-badge';
@@ -28,7 +28,6 @@ function parseQuery(p: ParamMap): MaterialQuery {
   return {
     search: p.get('search') ?? undefined,
     categoryId: p.get('categoryId') ?? undefined,
-    status: (p.get('status') as MaterialStatus | null) ?? undefined,
     lowStock: p.get('lowStock') === 'true' || undefined,
     outOfStock: p.get('outOfStock') === 'true' || undefined,
     sortBy: sortBy && SORTABLE.includes(sortBy) ? sortBy : 'code',
@@ -114,7 +113,6 @@ export class MaterialListPage {
       queryParams: {
         search: next.search || null,
         categoryId: next.categoryId || null,
-        status: next.status || null,
         lowStock: next.lowStock ? 'true' : null,
         outOfStock: next.outOfStock ? 'true' : null,
         sortBy: next.sortBy === 'code' ? null : next.sortBy,
