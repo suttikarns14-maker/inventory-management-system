@@ -73,6 +73,40 @@ export interface ProcurementRow {
   remainingValue: number;
 }
 
+/**
+ * Withdrawals per using department, most pieces first. Valued at the latest purchase price.
+ * Without `days` it covers all time, i.e. what is still out with each department.
+ */
+export interface DepartmentUsage {
+  /** null = withdrawals with no using department (old imported history). */
+  id: string | null;
+  name: string | null;
+  withdrawalCount: number;
+  quantity: number;
+  value: number;
+}
+
+/**
+ * Stock per storage location (SERIAL units where each unit is, other materials at the material's
+ * location). Latest purchase price, so the values add up to the summary's stockValue.
+ */
+export interface LocationStock {
+  /** null = no location; always the last row. */
+  id: string | null;
+  name: string | null;
+  /** Distinct materials. */
+  materials: number;
+  quantity: number;
+  value: number;
+}
+
+/** One material at a location: `GET /dashboard/by-location/:id/materials` (`:id` = "none" for no location). */
+export interface LocationMaterial extends MaterialBrief {
+  /** Pieces at this location only. */
+  quantity: number;
+  value: number;
+}
+
 /** Last 12 months, oldest first. Pieces withdrawn (reversed withdrawals excluded). */
 export interface MonthlyWithdrawals {
   /** YYYY-MM (Bangkok time). */

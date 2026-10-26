@@ -221,6 +221,7 @@ export const topWithdrawnSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
 });
 
-export const unusedSchema = z.object({
+/** `days` omitted = no time limit (unused, by-department). */
+export const daysSchema = z.object({
   days: z.coerce.number().int().positive().optional(),
 });
