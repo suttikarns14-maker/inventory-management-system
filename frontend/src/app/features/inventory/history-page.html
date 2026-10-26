@@ -63,6 +63,19 @@
     </mat-form-field>
 
     <mat-form-field>
+      <mat-label>หน่วยงานที่ใช้</mat-label>
+      <mat-select
+        [value]="query().usingDepartmentId ?? ''"
+        (selectionChange)="setFilter({ usingDepartmentId: $event.value || undefined })"
+      >
+        <mat-option value="">ทั้งหมด</mat-option>
+        @for (d of departments(); track d.id) {
+          <mat-option [value]="d.id">{{ d.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field>
       <mat-label>S/N</mat-label>
       <input
         matInput

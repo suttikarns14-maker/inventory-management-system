@@ -3,6 +3,8 @@ import { inject, Injectable } from '@angular/core';
 import { ApiSuccess } from '../../shared/models/api';
 import {
   DashboardSummary,
+  DepartmentUsage,
+  LocationStock,
   MonthlyWithdrawals,
   ProcurementRow,
   ReorderSuggestion,
@@ -40,6 +42,16 @@ export class DashboardService {
     return this.http
       .get<ApiSuccess<MonthlyWithdrawals[]>>(`${API}/dashboard/monthly-withdrawals`)
       .pipe(unwrap());
+  }
+
+  byDepartment(days: number | null) {
+    return this.http
+      .get<ApiSuccess<DepartmentUsage[]>>(`${API}/dashboard/by-department`, { params: toParams({ days }) })
+      .pipe(unwrap());
+  }
+
+  byLocation() {
+    return this.http.get<ApiSuccess<LocationStock[]>>(`${API}/dashboard/by-location`).pipe(unwrap());
   }
 
   unused(days: number | null) {

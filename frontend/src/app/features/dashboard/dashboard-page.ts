@@ -1,6 +1,7 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
@@ -10,11 +11,12 @@ import { StockTransaction } from '../../shared/models/transaction';
 import { InventoryService } from '../inventory/inventory.service';
 import { Notify } from '../../shared/services/notify';
 import { bangkokDate, daysAgo } from '../../shared/utils/date';
+import { API } from '../../shared/utils/http';
 import { DashboardService } from './dashboard.service';
 
 @Component({
   selector: 'app-dashboard-page',
-  imports: [DatePipe, DecimalPipe, RouterLink, MatButtonToggleModule, MatIconModule],
+  imports: [DatePipe, DecimalPipe, RouterLink, MatButtonModule, MatButtonToggleModule, MatIconModule],
   templateUrl: './dashboard-page.html',
   styleUrl: './dashboard-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -117,6 +119,23 @@ export class DashboardPage {
   protected itemsText(t: StockTransaction): string {
     return t.items.map((i) => `${i.material.name} ${i.quantity} ${i.material.unit}`).join(', ');
   }
+
+  // ---- by department (null = all time: what is still out with each department) ----
+  protected readonly deptDays = signal<number | null>(90);
+  protected readonly departments = toSignal(
+    toObservable(this.deptDays).pipe(
+      switchMap((days) => this.dashboard.byDepartment(days).pipe(this.safe([]))),
+    ),
+    { initialValue: undefined },
+  );
+
+  // ---- by storage location ----
+  protected readonly locations = toSignal(this.dashboard.byLocation().pipe(this.safe([])), {
+    initialValue: undefined,
+  });
+
+  /** Same-origin link: the session cookie goes along, the browser saves the file. */
+  protected readonly exportUrl = `${API}/dashboard/export`;
 
   // ---- unused ----
   /** null = never withdrawn at all. */

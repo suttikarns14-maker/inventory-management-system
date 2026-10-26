@@ -1,3 +1,4 @@
+import ExcelJS from 'exceljs';
 import type { z } from 'zod';
 import type { topWithdrawnSchema } from '../dtos/index.js';
 import { Prisma } from '../generated/prisma/client.js';
@@ -196,6 +197,59 @@ export function procurement() {
     ORDER BY 1 DESC, 2 NULLS FIRST`;
 }
 
+/**
+ * Withdrawals per using department, most pieces first; `days` omitted = all time, which is also
+ * what is still out with each department (P4 items 6 + 9). Valued at the latest purchase price.
+ */
+export function byDepartment(days: number | undefined) {
+  const cutoff = days ? daysAgo(days) : null;
+  return prisma.$queryRaw<
+    { id: string | null; name: string | null; withdrawalCount: number; quantity: number; value: number }[]
+  >`
+    SELECT d.id, d.name,
+           COUNT(DISTINCT t.id)::int AS "withdrawalCount",
+           SUM(i.quantity)::int AS quantity,
+           COALESCE(SUM(i.quantity * p.price), 0)::float8 AS value
+    FROM stock_transaction_items i
+    JOIN stock_transactions t ON t.id = i.transaction_id
+    JOIN materials m ON m.id = i.material_id
+    LEFT JOIN departments d ON d.id = t.using_department_id
+    LEFT JOIN LATERAL (${LATEST_PRICE}) p ON true
+    WHERE ${REAL_WITHDRAWAL} AND m.status = 'ACTIVE'
+      AND (${cutoff}::timestamptz IS NULL OR t.created_at >= ${cutoff}::timestamptz)
+    GROUP BY d.id
+    ORDER BY quantity DESC, d.name NULLS LAST`;
+}
+
+/**
+ * Stock per storage location: SERIAL units where each unit is, other materials at the material's
+ * location. Latest purchase price, so the total matches the summary's stock value. No location = last.
+ */
+export function byLocation() {
+  return prisma.$queryRaw<
+    { id: string | null; name: string | null; materials: number; quantity: number; value: number }[]
+  >`
+    WITH stock AS (
+      SELECT u.material_id, u.storage_location_id AS location_id, COUNT(*) AS qty
+      FROM material_units u WHERE u.status = 'IN_STOCK'
+      GROUP BY 1, 2
+      UNION ALL
+      SELECT m.id, m.storage_location_id, m.current_quantity
+      FROM materials m WHERE m.tracking_type = 'QUANTITY' AND m.current_quantity > 0
+    )
+    SELECT l.id, l.name,
+           COUNT(DISTINCT s.material_id)::int AS materials,
+           SUM(s.qty)::int AS quantity,
+           COALESCE(SUM(s.qty * p.price), 0)::float8 AS value
+    FROM stock s
+    JOIN materials m ON m.id = s.material_id
+    LEFT JOIN storage_locations l ON l.id = s.location_id
+    LEFT JOIN LATERAL (${LATEST_PRICE}) p ON true
+    WHERE m.status = 'ACTIVE'
+    GROUP BY l.id
+    ORDER BY l.id IS NULL, quantity DESC, l.name`;
+}
+
 /** Pieces withdrawn in each of the last 12 Bangkok months (oldest first), next to the same month a year earlier. */
 export async function monthlyWithdrawals() {
   const [y, m] = bangkokDate().slice(0, 7).split('-').map(Number) as [number, number];
@@ -217,4 +271,70 @@ export async function monthlyWithdrawals() {
       previousYearQuantity: qty.get(monthKey(back + 12)) ?? 0,
     };
   });
+}
+
+const EXPORT_DEPARTMENT_DAYS = 365;
+const BAHT = '#,##0.00';
+const INT = '#,##0';
+
+/** [header, key, width, number format] */
+type Col = [string, string, number, string?];
+
+function addTable(wb: ExcelJS.Workbook, name: string, cols: Col[], rows: object[]) {
+  const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1 }] });
+  ws.columns = cols.map(([header, key, width, numFmt]) => ({ header, key, width, style: numFmt ? { numFmt } : {} }));
+  ws.getRow(1).font = { bold: true };
+  ws.addRows(rows);
+}
+
+/** The dashboard as an .xlsx for the monthly report to management (P4 item 11, Q3 = Excel). */
+export async function exportWorkbook(): Promise<Buffer> {
+  const [s, reorder, procure, monthly, depts, locations, never] = await Promise.all([
+    summary(),
+    reorderSuggestions(),
+    procurement(),
+    monthlyWithdrawals(),
+    byDepartment(EXPORT_DEPARTMENT_DAYS),
+    byLocation(),
+    unused(undefined),
+  ]);
+  const wb = new ExcelJS.Workbook();
+  const material: Col[] = [['รหัส', 'code', 14], ['ชื่อวัสดุ', 'name', 40], ['ยี่ห้อ', 'brand', 16], ['รุ่น', 'model', 20]];
+
+  addTable(wb, 'สรุป', [['หัวข้อ', 'label', 44], ['ค่า', 'value', 20, INT]], [
+    { label: 'วันที่ออกรายงาน', value: bangkokDate() },
+    { label: 'วัสดุที่ใช้งานอยู่', value: s.activeMaterials },
+    { label: 'ต้องสั่งซื้อ', value: s.reorderCount },
+    { label: 'หมดสต็อก', value: s.outOfStockCount },
+    { label: 'ไม่เคยถูกเบิก', value: s.neverWithdrawnCount },
+    { label: 'รายการเบิกเดือนนี้', value: s.withdrawalsThisMonth },
+    { label: 'มูลค่าคลังคงเหลือ (บาท, ราคารับเข้าล่าสุด)', value: s.stockValue },
+    { label: 'วัสดุที่มีของแต่ไม่มีราคา (นับเป็น 0)', value: s.unpricedCount },
+    { label: `ชีต "แยกตามหน่วยงาน" คือการเบิก ${EXPORT_DEPARTMENT_DAYS} วันล่าสุด`, value: null },
+    {},
+    { label: 'มูลค่าคงเหลือตามประเภท (บาท)', value: null },
+    ...s.valueByCategory.map((c) => ({ label: c.name, value: c.value })),
+  ]);
+  addTable(wb, 'ควรสั่งซื้อ', [
+    ...material,
+    ['คงเหลือ', 'currentQuantity', 10, INT], ['หน่วย', 'unit', 8], ['จุดสั่งซื้อ', 'minStock', 10, INT],
+    ['ใช้เฉลี่ย/วัน', 'avgDailyUsage', 12], ['เหลือใช้ได้ (วัน)', 'daysLeft', 14, INT], ['แนะนำสั่ง', 'suggestedQty', 10, INT],
+  ], reorder);
+  addTable(wb, 'จัดซื้อตามปีงบ', [
+    ['ปีงบ', 'fiscalYear', 8], ['โครงการ (TOR)', 'projectName', 36],
+    ['รับเข้า (ชิ้น)', 'receivedQty', 12, INT], ['มูลค่าที่ซื้อ (บาท)', 'receivedValue', 16, BAHT], ['ไม่มีราคา (ชิ้น)', 'unpricedQty', 14, INT],
+    ['เบิกไป (%)', 'usedPercent', 10, INT], ['คงเหลือ (ชิ้น)', 'remainingQty', 12, INT], ['มูลค่าคงเหลือ (บาท)', 'remainingValue', 18, BAHT],
+  ], procure.map((p) => ({ ...p, usedPercent: p.receivedQty ? Math.round(((p.receivedQty - p.remainingQty) / p.receivedQty) * 100) : 0 })));
+  addTable(wb, 'เบิกรายเดือน', [['เดือน', 'month', 10], ['เบิก (ชิ้น)', 'quantity', 12, INT], ['ปีก่อน (ชิ้น)', 'previousYearQuantity', 14, INT]], monthly);
+  addTable(wb, 'แยกตามหน่วยงาน', [
+    ['หน่วยงานที่ใช้', 'name', 40], ['ครั้ง', 'withdrawalCount', 8, INT], ['ชิ้น', 'quantity', 8, INT], ['มูลค่า (บาท)', 'value', 16, BAHT],
+  ], depts.map((d) => ({ ...d, name: d.name ?? 'ไม่ระบุหน่วยงาน' })));
+  addTable(wb, 'แยกตามสถานที่เก็บ', [
+    ['สถานที่เก็บ', 'name', 52], ['วัสดุ (รายการ)', 'materials', 14, INT], ['ชิ้น', 'quantity', 8, INT], ['มูลค่า (บาท)', 'value', 16, BAHT],
+  ], locations.map((l) => ({ ...l, name: l.name ?? 'ไม่ระบุสถานที่' })));
+  addTable(wb, 'ไม่เคยถูกเบิก', [
+    ...material,
+    ['คงเหลือ', 'currentQuantity', 10, INT], ['หน่วย', 'unit', 8], ['ราคาต่อหน่วย (บาท)', 'unitPrice', 18, BAHT], ['มูลค่า (บาท)', 'value', 16, BAHT],
+  ], never);
+  return Buffer.from(await wb.xlsx.writeBuffer());
 }

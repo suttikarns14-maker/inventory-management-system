@@ -348,6 +348,9 @@ export class AppError extends Error {
 | | GET | `/dashboard/unused` | ADMIN, STAFF | `days` ถ้าไม่ส่งหมายถึง "ไม่เคยเบิกเลย" |
 | | GET | `/dashboard/procurement` | ADMIN, STAFF | ไม่มี query · ดู §6.5 |
 | | GET | `/dashboard/monthly-withdrawals` | ADMIN, STAFF | ไม่มี query · ดู §6.6 |
+| | GET | `/dashboard/by-department` | ADMIN, STAFF | `days` ถ้าไม่ส่งหมายถึงทั้งหมด · ดู §6.7 |
+| | GET | `/dashboard/by-location` | ADMIN, STAFF | ไม่มี query · ดู §6.8 |
+| | GET | `/dashboard/export` | ADMIN, STAFF | ไฟล์ `.xlsx` · ดู §6.9 |
 
 Filter สต็อกต่ำเทียบสอง column จึงใช้ field reference ของ Prisma:
 `where: { currentQuantity: { lte: prisma.material.fields.minStock } }`
@@ -602,7 +605,23 @@ Response: `ProcurementRow[]` = `{ fiscalYear, projectName, receivedQty, received
 
 Response: `MonthlyWithdrawals[]` = `{ month: "YYYY-MM", quantity, previousYearQuantity }`
 
-ใช้ `prisma.$queryRaw` แบบ tagged template สำหรับ §6.3–6.6 ห้ามต่อ string ของ SQL เอง ส่วน parameter ที่เป็น `null` ได้ต้อง cast type (`::int`) เพราะ Postgres อนุมาน type จาก `null` ไม่ได้
+### 6.7 `GET /dashboard/by-department` (การเบิกแยกตามหน่วยงานที่ใช้)
+
+รวมการเบิกจริงตาม `usingDepartment` ในช่วง `days` วันล่าสุด (ไม่ส่ง = ทั้งหมด ซึ่งก็คืออุปกรณ์ที่อยู่กับแต่ละหน่วยงาน) เรียงจำนวนชิ้นมากไปน้อย · มูลค่า = ชิ้น × ราคารับเข้าล่าสุด · แถวที่ไม่มีหน่วยงานมี `id: null` อยู่ท้าย
+
+Response: `DepartmentUsage[]` = `{ id, name, withdrawalCount, quantity, value }` · FE กดชื่อหน่วยงานไปที่ `/inventory/history?type=OUT&usingDepartmentId=`
+
+### 6.8 `GET /dashboard/by-location` (สต็อกแยกตามสถานที่เก็บ)
+
+ของในคลังแยกตามสถานที่: วัสดุ SERIAL ใช้สถานที่ของแต่ละชิ้น (`material_units.storage_location_id`) วัสดุ QUANTITY ใช้สถานที่ของวัสดุ · มูลค่าใช้ราคาล่าสุด รวมทุกแถวจึงเท่ากับ `stockValue` ใน summary · แถวไม่ระบุสถานที่ (`id: null`) อยู่ท้าย · สถานที่ที่ไม่มีของไม่แสดง
+
+Response: `LocationStock[]` = `{ id, name, materials, quantity, value }`
+
+### 6.9 `GET /dashboard/export` (ส่งออก Excel)
+
+ไฟล์ `dashboard-YYYY-MM-DD.xlsx` 7 ชีต: สรุป (KPI + มูลค่าตามประเภท), ควรสั่งซื้อ, จัดซื้อตามปีงบ, เบิกรายเดือน, แยกตามหน่วยงาน (365 วันล่าสุด), แยกตามสถานที่เก็บ, ไม่เคยถูกเบิก · ใช้ข้อมูลจาก §6.1–6.8 ชุดเดียวกับหน้าเว็บ · FE ใช้ลิงก์ `<a href download>` ธรรมดา (origin เดียวกัน cookie ส่งไปเอง)
+
+ใช้ `prisma.$queryRaw` แบบ tagged template สำหรับ §6.3–6.8 ห้ามต่อ string ของ SQL เอง ส่วน parameter ที่เป็น `null` ได้ต้อง cast type (`::int`) เพราะ Postgres อนุมาน type จาก `null` ไม่ได้
 
 ---
 
@@ -796,6 +815,9 @@ export const routes: Routes = [
 | วัสดุไม่เคยเบิก | `/dashboard/unused` | ตัวเลือก "ไม่เคยเลย / 90 / 180 วัน" แสดงยอดค้างและวันที่เบิกล่าสุด |
 | จัดซื้อตามปีงบ / อายุสต็อก | `/dashboard/procurement` | ตาราง ปีงบ/โครงการ · อายุ · รับเข้า · % ที่เบิกไป (แถบ CSS) · คงเหลือ · แถวที่อายุ ≥ 3 ปีและยังมีของเป็นสีส้ม |
 | แนวโน้มการเบิกรายเดือน | `/dashboard/monthly-withdrawals` | แท่งแนวตั้ง CSS 12 เดือน เดือนละ 2 แท่ง (ปีนี้ / ปีก่อน) |
+| การเบิกแยกตามหน่วยงานที่ใช้ | `/dashboard/by-department` | ตัวเลือก 90 วัน / 1 ปี / ทั้งหมด · กดชื่อหน่วยงานไปหน้าประวัติที่กรองไว้ |
+| สต็อกแยกตามสถานที่เก็บ | `/dashboard/by-location` | สถานที่ · จำนวนวัสดุ · ชิ้น · มูลค่า |
+| ปุ่ม "ส่งออก Excel" | `/dashboard/export` | หัวหน้า Dashboard |
 | รายการเบิกล่าสุด | `/inventory/history?type=OUT&limit=10` | ใช้ endpoint ประวัติเดิม ตัดรายการยกเลิกรับเข้าออก · ลิงก์ "ดูทั้งหมด" ไปหน้าประวัติ |
 
 ### 8.7 Decimal และวันที่

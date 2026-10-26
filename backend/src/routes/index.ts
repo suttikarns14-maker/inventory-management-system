@@ -74,6 +74,9 @@ export function apiRouter(): Router {
   r.get('/dashboard/unused', staff, dashboards.unused);
   r.get('/dashboard/procurement', staff, dashboards.procurement);
   r.get('/dashboard/monthly-withdrawals', staff, dashboards.monthlyWithdrawals);
+  r.get('/dashboard/by-department', staff, dashboards.byDepartment);
+  r.get('/dashboard/by-location', staff, dashboards.byLocation);
+  r.get('/dashboard/export', staff, dashboards.exportXlsx);
 
   return r;
 }

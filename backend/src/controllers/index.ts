@@ -14,6 +14,7 @@ import * as materials from '../services/material.service.js';
 import * as transactions from '../services/transaction.service.js';
 import * as users from '../services/user.service.js';
 import { AppError } from '../utils/app-error.js';
+import { bangkokDate } from '../utils/date.js';
 import { ok, sendPage } from '../utils/http.js';
 
 // Controllers only parse input (Zod DTOs; a ZodError becomes VALIDATION_ERROR in the error
@@ -184,12 +185,24 @@ export const dashboards = {
     ok(res, await dashboard.topWithdrawn(dto.topWithdrawnSchema.parse(req.query)));
   },
   async unused(req: Request, res: Response) {
-    ok(res, await dashboard.unused(dto.unusedSchema.parse(req.query).days));
+    ok(res, await dashboard.unused(dto.daysSchema.parse(req.query).days));
   },
   async procurement(_req: Request, res: Response) {
     ok(res, await dashboard.procurement());
   },
   async monthlyWithdrawals(_req: Request, res: Response) {
     ok(res, await dashboard.monthlyWithdrawals());
+  },
+  async byDepartment(req: Request, res: Response) {
+    ok(res, await dashboard.byDepartment(dto.daysSchema.parse(req.query).days));
+  },
+  async byLocation(_req: Request, res: Response) {
+    ok(res, await dashboard.byLocation());
+  },
+  async exportXlsx(_req: Request, res: Response) {
+    res
+      .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .attachment(`dashboard-${bangkokDate()}.xlsx`)
+      .send(await dashboard.exportWorkbook());
   },
 };

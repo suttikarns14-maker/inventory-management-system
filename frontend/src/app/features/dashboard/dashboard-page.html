@@ -1,5 +1,8 @@
 <div class="page-header">
   <h1>ภาพรวมคลัง</h1>
+  <a mat-stroked-button [href]="exportUrl" download>
+    <mat-icon>download</mat-icon> ส่งออก Excel
+  </a>
 </div>
 
 @let s = summary();
@@ -274,6 +277,104 @@
             <tr>
               <td colspan="3" class="empty">
                 {{ recent() === undefined ? 'กำลังโหลด...' : 'ยังไม่มีรายการเบิก' }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div class="two-col spaced">
+  <section class="card">
+    <div class="card-head">
+      <h2>การเบิกแยกตามหน่วยงานที่ใช้</h2>
+      <mat-button-toggle-group
+        [value]="deptDays()"
+        (change)="deptDays.set($event.value)"
+        hideSingleSelectionIndicator
+        aria-label="ช่วงเวลา"
+      >
+        <mat-button-toggle [value]="90">90 วัน</mat-button-toggle>
+        <mat-button-toggle [value]="365">1 ปี</mat-button-toggle>
+        <mat-button-toggle [value]="null">ทั้งหมด</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+    <p class="muted hint">
+      @if (deptDays() === null) {
+        "ทั้งหมด" คืออุปกรณ์ที่เบิกออกไปอยู่กับแต่ละหน่วยงาน · กดชื่อหน่วยงานเพื่อดู S/N และหมายเหตุ
+      } @else {
+        กดชื่อหน่วยงานเพื่อดูรายการเบิก · มูลค่าคิดจากราคารับเข้าล่าสุด
+      }
+    </p>
+    <div class="table-wrap scroll-box">
+      <table class="simple">
+        <thead>
+          <tr>
+            <th>หน่วยงานที่ใช้</th>
+            <th class="num">ครั้ง</th>
+            <th class="num">ชิ้น</th>
+            <th class="num">มูลค่า (บาท)</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (d of departments() ?? []; track d.id) {
+            <tr>
+              <td>
+                @if (d.id) {
+                  <a routerLink="/inventory/history" [queryParams]="{ type: 'OUT', usingDepartmentId: d.id }">{{ d.name }}</a>
+                } @else {
+                  <span class="muted">ไม่ระบุหน่วยงาน</span>
+                }
+              </td>
+              <td class="num">{{ d.withdrawalCount | number }}</td>
+              <td class="num">{{ d.quantity | number }}</td>
+              <td class="num">{{ d.value | number: '1.0-0' }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="4" class="empty">
+                {{ departments() === undefined ? 'กำลังโหลด...' : 'ไม่มีการเบิกในช่วงนี้' }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>สต็อกแยกตามสถานที่เก็บ</h2>
+    <p class="muted hint">ของที่อยู่ในคลัง · มูลค่าคิดจากราคารับเข้าล่าสุด (รวมแล้วเท่ากับมูลค่าคลังคงเหลือ)</p>
+    <div class="table-wrap scroll-box">
+      <table class="simple">
+        <thead>
+          <tr>
+            <th>สถานที่เก็บ</th>
+            <th class="num">วัสดุ</th>
+            <th class="num">ชิ้น</th>
+            <th class="num">มูลค่า (บาท)</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (l of locations() ?? []; track l.id) {
+            <tr>
+              <td>
+                @if (l.name) {
+                  {{ l.name }}
+                } @else {
+                  <span class="muted">ไม่ระบุสถานที่</span>
+                }
+              </td>
+              <td class="num">{{ l.materials | number }}</td>
+              <td class="num">{{ l.quantity | number }}</td>
+              <td class="num">{{ l.value | number: '1.0-0' }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="4" class="empty">
+                {{ locations() === undefined ? 'กำลังโหลด...' : 'ยังไม่มีของในคลัง' }}
               </td>
             </tr>
           }

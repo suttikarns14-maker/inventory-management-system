@@ -1,3 +1,4 @@
+import ExcelJS from 'exceljs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/lib/prisma.js';
 import { depts, loginAs, out, seedBasics } from './helpers.js';
@@ -134,5 +135,61 @@ describe('dashboard (spec §6)', () => {
     // 365 days ago is last year's same month (or the one before, in a leap year): checked by the total.
     expect(months.reduce((s: number, m: { previousYearQuantity: number }) => s + m.previousYearQuantity, 0)).toBe(3);
     expect((await (await loginAs('user')).get('/api/v1/dashboard/monthly-withdrawals')).status).toBe(403);
+  });
+
+  it('totals withdrawals per using department within a period', async () => {
+    const admin = await loginAs('admin');
+    await admin.post('/api/v1/inventory/transactions').send({ type: 'IN', items: [{ materialId: fx.paper.id, quantity: 1, unitPrice: 10 }] });
+    await admin.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 2, { requesterName: 'ก' })); // -> sub
+    const old = (await admin.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 3, { requesterName: 'ก' }))).body.data;
+    await prisma.stockTransaction.update({ where: { id: old.id }, data: { createdAt: new Date(Date.now() - 100 * 86_400_000) } });
+    await admin.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 1, { requesterName: 'ก', usingDepartmentId: fx.main.id }));
+    const mistake = (await admin.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 2, { requesterName: 'ก' }))).body.data;
+    await admin.post(`/api/v1/inventory/transactions/${mistake.id}/reverse`).send({ note: 'ผิด' });
+
+    const all = (await admin.get('/api/v1/dashboard/by-department')).body.data;
+    expect(all).toEqual([
+      { id: fx.sub.id, name: 'งานธุรการ', withdrawalCount: 2, quantity: 5, value: 50 },
+      { id: fx.main.id, name: 'ฝ่ายเทคโนโลยีสารสนเทศ', withdrawalCount: 1, quantity: 1, value: 0 },
+    ]);
+    const recent = (await admin.get('/api/v1/dashboard/by-department?days=30')).body.data;
+    expect(recent[0]).toMatchObject({ id: fx.sub.id, withdrawalCount: 1, quantity: 2, value: 20 });
+  });
+
+  it('totals stock per storage location: units where they are, other materials at their own location', async () => {
+    const admin = await loginAs('admin');
+    const [l1, l2] = await Promise.all(['ห้อง 1', 'ห้อง 2'].map((name) => prisma.storageLocation.create({ data: { name } })));
+    await prisma.material.update({ where: { id: fx.paper.id }, data: { storageLocationId: l1.id } });
+    await admin.post('/api/v1/inventory/transactions').send({ type: 'IN', items: [{ materialId: fx.paper.id, quantity: 10, unitPrice: 5 }] });
+    const ram = await prisma.material.create({
+      data: { code: 'HW-001', name: 'RAM', unit: 'ชิ้น', minStock: 0, categoryId: fx.category.id, trackingType: 'SERIAL', storageLocationId: l1.id },
+    });
+    await admin.post('/api/v1/inventory/transactions').send({ type: 'IN', items: [{ materialId: ram.id, serialNumbers: ['A1', 'A2'], unitPrice: 100 }] });
+    await prisma.materialUnit.updateMany({ where: { materialId: ram.id }, data: { storageLocationId: l2.id } });
+
+    const rows = (await admin.get('/api/v1/dashboard/by-location')).body.data;
+    expect(rows).toEqual([
+      { id: l1.id, name: 'ห้อง 1', materials: 1, quantity: 30, value: 150 },
+      { id: l2.id, name: 'ห้อง 2', materials: 1, quantity: 2, value: 200 },
+      { id: null, name: null, materials: 1, quantity: 3, value: 0 }, // pens: no location, last
+    ]);
+  });
+
+  it('exports the dashboard as an Excel workbook (ADMIN, STAFF)', async () => {
+    const staff = await loginAs('staff');
+    const res = await staff.get('/api/v1/dashboard/export').buffer(true).parse((r, cb) => {
+      const chunks: Buffer[] = [];
+      r.on('data', (c: Buffer) => chunks.push(c));
+      r.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toMatch(/dashboard-\d{4}-\d{2}-\d{2}\.xlsx/);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(res.body);
+    expect(wb.worksheets.map((w) => w.name)).toEqual([
+      'สรุป', 'ควรสั่งซื้อ', 'จัดซื้อตามปีงบ', 'เบิกรายเดือน', 'แยกตามหน่วยงาน', 'แยกตามสถานที่เก็บ', 'ไม่เคยถูกเบิก',
+    ]);
+    expect(wb.getWorksheet('ควรสั่งซื้อ')!.getCell('A2').value).toBe('OFF-002'); // pens are below min stock
+    expect((await (await loginAs('user')).get('/api/v1/dashboard/export')).status).toBe(403);
   });
 });
