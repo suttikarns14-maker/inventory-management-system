@@ -55,3 +55,29 @@ export interface UnusedMaterial extends MaterialBrief {
 }
 
 export type TopWithdrawnSort = 'quantity' | 'count';
+
+/**
+ * One fiscal year + project (TOR). Counted per unit (SERIAL materials), each at the price on its own
+ * receipt line; reversed receipts and inactive materials are left out. Newest year first.
+ */
+export interface ProcurementRow {
+  /** Thai fiscal year (B.E.); receipts saved without one use the fiscal year of their date. */
+  fiscalYear: number;
+  projectName: string | null;
+  receivedQty: number;
+  /** Baht; unpriced units count as 0. */
+  receivedValue: number;
+  unpricedQty: number;
+  /** Still IN_STOCK: the stock-age view. */
+  remainingQty: number;
+  remainingValue: number;
+}
+
+/** Last 12 months, oldest first. Pieces withdrawn (reversed withdrawals excluded). */
+export interface MonthlyWithdrawals {
+  /** YYYY-MM (Bangkok time). */
+  month: string;
+  quantity: number;
+  /** Same month one year earlier. */
+  previousYearQuantity: number;
+}

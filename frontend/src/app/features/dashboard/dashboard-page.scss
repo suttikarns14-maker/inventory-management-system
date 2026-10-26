@@ -200,3 +200,91 @@
 .nowrap {
   white-space: nowrap;
 }
+
+.legend {
+  margin: 8px 0 0;
+  font: var(--mat-sys-body-small);
+}
+
+.used-col {
+  min-width: 120px;
+}
+
+.reversed td {
+  text-decoration: line-through;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// ---- monthly trend: CSS bars, no chart library ----
+.key-now {
+  background: var(--mat-sys-primary);
+}
+
+.key-prev {
+  background: var(--mat-sys-outline-variant);
+}
+
+.legend-keys {
+  display: flex;
+  gap: 12px;
+  font: var(--mat-sys-body-small);
+  color: var(--mat-sys-on-surface-variant);
+
+  span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+}
+
+.key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.month-chart {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 4px;
+  height: 260px;
+}
+
+.month {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.month-value {
+  font: var(--mat-sys-label-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.month-bars {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.mbar {
+  width: 40%;
+  max-width: 14px;
+  min-height: 1px;
+  border-radius: 3px 3px 0 0;
+}
+
+.month-label {
+  margin-top: 4px;
+  font: var(--mat-sys-label-small);
+  color: var(--mat-sys-on-surface-variant);
+  text-align: center;
+  line-height: 1.2;
+  min-height: 2.4em; // room for the year line, so bars stay aligned
+}

@@ -346,6 +346,8 @@ export class AppError extends Error {
 | | GET | `/dashboard/reorder-suggestions` | ADMIN, STAFF | |
 | | GET | `/dashboard/top-withdrawn` | ADMIN, STAFF | `from`, `to` (ค่าเริ่มต้น 30 วันล่าสุด), `sortBy` (`quantity`\|`count`), `limit` (ค่าเริ่มต้น 10) |
 | | GET | `/dashboard/unused` | ADMIN, STAFF | `days` ถ้าไม่ส่งหมายถึง "ไม่เคยเบิกเลย" |
+| | GET | `/dashboard/procurement` | ADMIN, STAFF | ไม่มี query · ดู §6.5 |
+| | GET | `/dashboard/monthly-withdrawals` | ADMIN, STAFF | ไม่มี query · ดู §6.6 |
 
 Filter สต็อกต่ำเทียบสอง column จึงใช้ field reference ของ Prisma:
 `where: { currentQuantity: { lte: prisma.material.fields.minStock } }`
@@ -588,7 +590,19 @@ WHERE m.status = 'ACTIVE'
 ORDER BY lo.last_out_at NULLS FIRST, m.current_quantity DESC;
 ```
 
-ใช้ `prisma.$queryRaw` แบบ tagged template สำหรับ §6.3 และ §6.4 ห้ามต่อ string ของ SQL เอง ส่วน parameter ที่เป็น `null` ได้ต้อง cast type (`::int`) เพราะ Postgres อนุมาน type จาก `null` ไม่ได้
+### 6.5 `GET /dashboard/procurement` (จัดซื้อตามปีงบ / อายุสต็อก)
+
+1 แถวต่อ ปีงบ + ชื่อโครงการ (TOR) จากใบรับเข้า (IN) ที่ไม่ถูกยกเลิก เรียงปีงบใหม่ไปเก่า · **นับเป็นรายชิ้น** (`transaction_units` → `material_units`) จึงใช้ได้กับวัสดุ `SERIAL` เท่านั้น (ทุกวัสดุเป็น SERIAL ตาม D15) · มูลค่าของแต่ละชิ้นใช้ราคาในบรรทัดใบรับเข้าของชิ้นนั้น (ไม่ใช่ราคาล่าสุด) ชิ้นที่ไม่มีราคานับเป็น 0 · ใบรับเข้าที่ไม่ได้ระบุปีงบใช้ปีงบตามวันที่ (เริ่ม 1 ต.ค.) · ไม่นับวัสดุ INACTIVE
+
+Response: `ProcurementRow[]` = `{ fiscalYear, projectName, receivedQty, receivedValue, unpricedQty, remainingQty, remainingValue }` โดย `remaining*` คือชิ้นที่ยัง `IN_STOCK`
+
+### 6.6 `GET /dashboard/monthly-withdrawals` (แนวโน้มการเบิกรายเดือน)
+
+12 เดือนล่าสุดตามเวลาไทย (เก่าไปใหม่) จำนวนชิ้นที่เบิกจริง (ไม่นับรายการที่ยกเลิก และวัสดุ INACTIVE) เทียบกับเดือนเดียวกันของปีก่อน
+
+Response: `MonthlyWithdrawals[]` = `{ month: "YYYY-MM", quantity, previousYearQuantity }`
+
+ใช้ `prisma.$queryRaw` แบบ tagged template สำหรับ §6.3–6.6 ห้ามต่อ string ของ SQL เอง ส่วน parameter ที่เป็น `null` ได้ต้อง cast type (`::int`) เพราะ Postgres อนุมาน type จาก `null` ไม่ได้
 
 ---
 
@@ -780,6 +794,9 @@ export const routes: Routes = [
 | ตาราง "ควรสั่งซื้อ" | `/dashboard/reorder-suggestions` | ไฮไลต์หมดสต็อกเป็นสีแดง และ `daysLeft <= 7` เป็นสีส้ม |
 | อันดับเบิกมากที่สุด | `/dashboard/top-withdrawn` | แท่งแนวนอน CSS Top 10, ตัวเลือก 30/90/365 วัน, สลับจำนวน/ครั้งได้ |
 | วัสดุไม่เคยเบิก | `/dashboard/unused` | ตัวเลือก "ไม่เคยเลย / 90 / 180 วัน" แสดงยอดค้างและวันที่เบิกล่าสุด |
+| จัดซื้อตามปีงบ / อายุสต็อก | `/dashboard/procurement` | ตาราง ปีงบ/โครงการ · อายุ · รับเข้า · % ที่เบิกไป (แถบ CSS) · คงเหลือ · แถวที่อายุ ≥ 3 ปีและยังมีของเป็นสีส้ม |
+| แนวโน้มการเบิกรายเดือน | `/dashboard/monthly-withdrawals` | แท่งแนวตั้ง CSS 12 เดือน เดือนละ 2 แท่ง (ปีนี้ / ปีก่อน) |
+| รายการเบิกล่าสุด | `/inventory/history?type=OUT&limit=10` | ใช้ endpoint ประวัติเดิม ตัดรายการยกเลิกรับเข้าออก · ลิงก์ "ดูทั้งหมด" ไปหน้าประวัติ |
 
 ### 8.7 Decimal และวันที่
 
