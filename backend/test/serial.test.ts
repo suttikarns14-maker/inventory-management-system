@@ -117,7 +117,7 @@ describe('serial-tracked materials (spec v2.2 §2.3)', () => {
     await admin.post('/api/v1/inventory/transactions').send(receive(['SN-A']));
     const res = await admin.put(`/api/v1/materials/${ramId}`).send({
       code: 'HW-001', name: 'RAM 16GB', brand: 'Apacer', categoryId: fx.category.id, unit: 'ชิ้น', minStock: 5,
-      status: 'ACTIVE', trackingType: 'QUANTITY',
+      trackingType: 'QUANTITY',
     });
     expect(res.body.error.details[0].field).toBe('trackingType');
   });

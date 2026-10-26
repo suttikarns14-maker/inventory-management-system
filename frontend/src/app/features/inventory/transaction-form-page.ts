@@ -172,7 +172,7 @@ export class TransactionFormPage {
   protected readonly options = toSignal(
     this.search$.pipe(
       switchMap((search) =>
-        this.materials.list({ search: search || undefined, status: 'ACTIVE', limit: 10 }).pipe(
+        this.materials.list({ search: search || undefined, limit: 10 }).pipe(
           map((page) => page.items),
           catchError(() => of<Material[]>([])),
         ),

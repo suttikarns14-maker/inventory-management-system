@@ -14,7 +14,6 @@ export interface ApiSuccess<T> {
 export type ErrorCode =
   | 'VALIDATION_ERROR'
   | 'INSUFFICIENT_STOCK'
-  | 'MATERIAL_INACTIVE'
   | 'INVALID_CREDENTIALS'
   | 'UNAUTHORIZED'
   | 'USER_INACTIVE'

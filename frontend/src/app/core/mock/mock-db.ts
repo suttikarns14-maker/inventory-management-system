@@ -1,5 +1,8 @@
 import { Role } from '../../shared/models/user';
-import { MaterialStatus, TrackingType } from '../../shared/models/material';
+import { TrackingType } from '../../shared/models/material';
+
+/** Mock only: the real system dropped material status on 2026-10-26 (the mock is frozen). */
+export type MaterialStatus = 'ACTIVE' | 'INACTIVE';
 import { DepartmentKind } from '../../shared/models/lookup';
 import { TransactionType } from '../../shared/models/transaction';
 

@@ -65,7 +65,6 @@ export const categorySchema = z.object({
 export const listMaterialsSchema = pageQuery.extend({
   search: z.string().trim().optional(),
   categoryId: z.string().optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE']).default('ACTIVE'),
   lowStock: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
   outOfStock: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
   storageLocationId: z.string().optional(),
@@ -95,10 +94,7 @@ const materialFields = {
   storageLocationId: optionalId,
 };
 export const createMaterialSchema = z.object(materialFields);
-export const updateMaterialSchema = z.object({
-  ...materialFields,
-  status: z.enum(['ACTIVE', 'INACTIVE'], { error: 'สถานะไม่ถูกต้อง' }),
-});
+export const updateMaterialSchema = z.object(materialFields);
 
 // ---- inventory ----
 

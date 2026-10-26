@@ -59,7 +59,7 @@ describe('roles (spec §1)', () => {
     const agent = await loginAs('staff');
     const body = { code: 'NEW-1', name: 'ใหม่', categoryId: fx.category.id, unit: 'ชิ้น', minStock: 1 };
     expect((await agent.post('/api/v1/materials').send(body)).status).toBe(201);
-    expect((await agent.put(`/api/v1/materials/${fx.paper.id}`).send({ ...body, status: 'ACTIVE' })).status).toBe(403);
+    expect((await agent.put(`/api/v1/materials/${fx.paper.id}`).send(body)).status).toBe(403);
     expect((await agent.get('/api/v1/dashboard/summary')).status).toBe(200);
   });
 });
@@ -118,7 +118,6 @@ describe('materials', () => {
       categoryId: fx.category.id,
       unit: 'รีม',
       minStock: 5,
-      status: 'ACTIVE',
       currentQuantity: 9999,
     });
     expect(res.status).toBe(200);

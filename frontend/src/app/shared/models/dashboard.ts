@@ -1,12 +1,12 @@
 export interface DashboardSummary {
-  activeMaterials: number;
+  totalMaterials: number;
   reorderCount: number;
   outOfStockCount: number;
   neverWithdrawnCount: number;
   withdrawalsThisMonth: number;
-  /** Baht: remaining quantity × latest purchase price, active materials only. */
+  /** Baht: remaining quantity × latest purchase price. */
   stockValue: number;
-  /** Active materials in stock that were never received with a price (counted as 0 baht). */
+  /** Materials in stock that were never received with a price (counted as 0 baht). */
   unpricedCount: number;
   /** Most valuable first. */
   valueByCategory: { id: string; name: string; value: number }[];
@@ -14,7 +14,7 @@ export interface DashboardSummary {
   dataQuality: {
     /** Placeholder S/N from the import (not VOID). */
     tempSerials: number;
-    /** Active materials whose min stock is still the import default. */
+    /** Materials whose min stock is still the import default. */
     defaultMinStock: number;
     /** Withdrawals missing the requesting or using department (old history that was not matched). */
     missingDepartments: number;
@@ -58,7 +58,7 @@ export type TopWithdrawnSort = 'quantity' | 'count';
 
 /**
  * One fiscal year + project (TOR). Counted per unit (SERIAL materials), each at the price on its own
- * receipt line; reversed receipts and inactive materials are left out. Newest year first.
+ * receipt line; reversed receipts are left out. Newest year first.
  */
 export interface ProcurementRow {
   /** Thai fiscal year (B.E.); receipts saved without one use the fiscal year of their date. */

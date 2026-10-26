@@ -1,5 +1,4 @@
 import { bangkokDate, DAY_MS } from '../../shared/utils/date';
-import { MaterialStatus } from '../../shared/models/material';
 import {
   CategoryRow,
   MaterialRow,
@@ -7,6 +6,7 @@ import {
   TransactionItemRow,
   TransactionRow,
   UserRow,
+  MaterialStatus,
 } from './mock-db';
 
 export const MOCK_PASSWORD = 'password123';

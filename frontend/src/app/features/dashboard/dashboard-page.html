@@ -8,8 +8,8 @@
 @let s = summary();
 <div class="kpis">
   <a class="kpi" routerLink="/materials">
-    <span class="kpi-label">วัสดุที่ใช้งานอยู่</span>
-    <span class="kpi-value">{{ s?.activeMaterials ?? '-' }}</span>
+    <span class="kpi-label">วัสดุทั้งหมด</span>
+    <span class="kpi-value">{{ s?.totalMaterials ?? '-' }}</span>
   </a>
   <button type="button" class="kpi" [class.kpi-danger]="(s?.reorderCount ?? 0) > 0" (click)="reorderCard.scrollIntoView({ behavior: 'smooth' })">
     <span class="kpi-label">ต้องสั่งซื้อ</span>

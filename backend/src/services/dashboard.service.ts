@@ -36,14 +36,13 @@ const LATEST_PRICE = Prisma.sql`
 export async function summary() {
   const monthStart = bangkokDayStart(`${bangkokDate().slice(0, 7)}-01`);
   const [counts] = await prisma.$queryRaw<
-    { activeMaterials: number; outOfStockCount: number; neverWithdrawnCount: number; withdrawalsThisMonth: number }[]
+    { totalMaterials: number; outOfStockCount: number; neverWithdrawnCount: number; withdrawalsThisMonth: number }[]
   >`
     SELECT
-      (SELECT COUNT(*) FROM materials WHERE status = 'ACTIVE')::int AS "activeMaterials",
-      (SELECT COUNT(*) FROM materials WHERE status = 'ACTIVE' AND current_quantity = 0)::int AS "outOfStockCount",
+      (SELECT COUNT(*) FROM materials)::int AS "totalMaterials",
+      (SELECT COUNT(*) FROM materials WHERE current_quantity = 0)::int AS "outOfStockCount",
       (SELECT COUNT(*) FROM materials m
-        WHERE m.status = 'ACTIVE'
-          AND NOT EXISTS (
+        WHERE NOT EXISTS (
             SELECT 1 FROM stock_transaction_items i
             JOIN stock_transactions t ON t.id = i.transaction_id
             WHERE i.material_id = m.id AND ${REAL_WITHDRAWAL}))::int AS "neverWithdrawnCount",
@@ -58,7 +57,6 @@ export async function summary() {
     FROM materials m
     JOIN categories c ON c.id = m.category_id
     LEFT JOIN LATERAL (${LATEST_PRICE}) p ON true
-    WHERE m.status = 'ACTIVE'
     GROUP BY c.id
     ORDER BY value DESC, c.name`;
 
@@ -68,7 +66,7 @@ export async function summary() {
     SELECT
       (SELECT COUNT(*) FROM material_units WHERE is_temp_serial AND status <> 'VOID')::int AS "tempSerials",
       (SELECT COUNT(*) FROM materials
-        WHERE status = 'ACTIVE' AND min_stock = ${IMPORT_DEFAULT_MIN_STOCK})::int AS "defaultMinStock",
+        WHERE min_stock = ${IMPORT_DEFAULT_MIN_STOCK})::int AS "defaultMinStock",
       (SELECT COUNT(*) FROM stock_transactions t
         WHERE ${REAL_WITHDRAWAL}
           AND (t.requesting_department_id IS NULL OR t.using_department_id IS NULL))::int AS "missingDepartments"`;
@@ -97,8 +95,7 @@ export async function reorderSuggestions() {
       JOIN stock_transactions t ON t.id = i.transaction_id
       WHERE ${REAL_WITHDRAWAL} AND t.created_at >= ${daysAgo(USAGE_WINDOW_DAYS)}
       GROUP BY i.material_id
-    ) u ON u.material_id = m.id
-    WHERE m.status = 'ACTIVE'`;
+    ) u ON u.material_id = m.id`;
 
   return rows
     .map(({ used, ...m }) => {
@@ -135,7 +132,6 @@ export function topWithdrawn(q: z.infer<typeof topWithdrawnSchema>) {
     JOIN materials m ON m.id = i.material_id
     WHERE ${REAL_WITHDRAWAL}
       AND t.created_at >= ${from} AND t.created_at < ${to}
-      AND m.status = 'ACTIVE'
     GROUP BY m.id
     ORDER BY ${orderBy} DESC, m.code
     LIMIT ${q.limit}`;
@@ -161,8 +157,7 @@ export function unused(days: number | undefined) {
       JOIN stock_transactions t ON t.id = i.transaction_id
       WHERE i.material_id = m.id AND ${REAL_WITHDRAWAL}
     ) lo ON true
-    WHERE m.status = 'ACTIVE'
-      AND (lo.last_out_at IS NULL OR (${cutoff}::timestamptz IS NOT NULL AND lo.last_out_at < ${cutoff}::timestamptz))
+    WHERE (lo.last_out_at IS NULL OR (${cutoff}::timestamptz IS NOT NULL AND lo.last_out_at < ${cutoff}::timestamptz))
     ORDER BY value DESC, lo.last_out_at ASC NULLS FIRST, m.current_quantity DESC`;
 }
 
@@ -188,11 +183,9 @@ export function procurement() {
     FROM stock_transactions t
     JOIN transaction_units tu ON tu.transaction_id = t.id
     JOIN material_units u ON u.id = tu.unit_id
-    JOIN materials m ON m.id = u.material_id
     JOIN stock_transaction_items i ON i.transaction_id = t.id AND i.material_id = u.material_id
     WHERE t.type = 'IN' AND t.reversal_of_id IS NULL
       AND NOT EXISTS (SELECT 1 FROM stock_transactions r WHERE r.reversal_of_id = t.id)
-      AND m.status = 'ACTIVE'
     GROUP BY 1, 2
     ORDER BY 1 DESC, 2 NULLS FIRST`;
 }
@@ -215,7 +208,7 @@ export function byDepartment(days: number | undefined) {
     JOIN materials m ON m.id = i.material_id
     LEFT JOIN departments d ON d.id = t.using_department_id
     LEFT JOIN LATERAL (${LATEST_PRICE}) p ON true
-    WHERE ${REAL_WITHDRAWAL} AND m.status = 'ACTIVE'
+    WHERE ${REAL_WITHDRAWAL}
       AND (${cutoff}::timestamptz IS NULL OR t.created_at >= ${cutoff}::timestamptz)
     GROUP BY d.id
     ORDER BY quantity DESC, d.name NULLS LAST`;
@@ -249,7 +242,6 @@ export function byLocation() {
     JOIN materials m ON m.id = s.material_id
     LEFT JOIN storage_locations l ON l.id = s.location_id
     LEFT JOIN LATERAL (${LATEST_PRICE}) p ON true
-    WHERE m.status = 'ACTIVE'
     GROUP BY l.id
     ORDER BY l.id IS NULL, quantity DESC, l.name`;
 }
@@ -266,7 +258,7 @@ export function locationMaterials(locationId: string | null) {
     FROM stock s
     JOIN materials m ON m.id = s.material_id
     LEFT JOIN LATERAL (${LATEST_PRICE}) p ON true
-    WHERE m.status = 'ACTIVE' AND s.location_id IS NOT DISTINCT FROM ${locationId}::text
+    WHERE s.location_id IS NOT DISTINCT FROM ${locationId}::text
     GROUP BY m.id
     ORDER BY quantity DESC, m.code`;
 }
@@ -279,8 +271,7 @@ export async function monthlyWithdrawals() {
     SELECT to_char(t.created_at AT TIME ZONE 'Asia/Bangkok', 'YYYY-MM') AS month, SUM(i.quantity)::int AS quantity
     FROM stock_transaction_items i
     JOIN stock_transactions t ON t.id = i.transaction_id
-    JOIN materials m ON m.id = i.material_id
-    WHERE ${REAL_WITHDRAWAL} AND m.status = 'ACTIVE'
+    WHERE ${REAL_WITHDRAWAL}
       AND t.created_at >= ${bangkokDayStart(`${monthKey(23)}-01`)}
     GROUP BY 1`;
   const qty = new Map(rows.map((r) => [r.month, r.quantity]));
@@ -324,7 +315,7 @@ export async function exportWorkbook(): Promise<Buffer> {
 
   addTable(wb, 'สรุป', [['หัวข้อ', 'label', 44], ['ค่า', 'value', 20, INT]], [
     { label: 'วันที่ออกรายงาน', value: bangkokDate() },
-    { label: 'วัสดุที่ใช้งานอยู่', value: s.activeMaterials },
+    { label: 'วัสดุทั้งหมด', value: s.totalMaterials },
     { label: 'ต้องสั่งซื้อ', value: s.reorderCount },
     { label: 'หมดสต็อก', value: s.outOfStockCount },
     { label: 'ไม่เคยถูกเบิก', value: s.neverWithdrawnCount },

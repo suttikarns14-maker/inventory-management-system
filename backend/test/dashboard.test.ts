@@ -39,7 +39,7 @@ describe('dashboard (spec §6)', () => {
 
     const summary = (await staff.get('/api/v1/dashboard/summary')).body.data;
     expect(summary).toEqual({
-      activeMaterials: 3,
+      totalMaterials: 3,
       outOfStockCount: 0,
       neverWithdrawnCount: 1,
       withdrawalsThisMonth: 3,
