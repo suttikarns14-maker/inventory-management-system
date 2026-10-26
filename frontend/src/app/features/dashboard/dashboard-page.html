@@ -346,7 +346,7 @@
 
   <section class="card">
     <h2>สต็อกแยกตามสถานที่เก็บ</h2>
-    <p class="muted hint">ของที่อยู่ในคลัง · มูลค่าคิดจากราคารับเข้าล่าสุด (รวมแล้วเท่ากับมูลค่าคลังคงเหลือ)</p>
+    <p class="muted hint">ของที่อยู่ในคลัง · กดชื่อสถานที่เพื่อดูวัสดุที่เก็บอยู่ · มูลค่าคิดจากราคารับเข้าล่าสุด (รวมแล้วเท่ากับมูลค่าคลังคงเหลือ)</p>
     <div class="table-wrap scroll-box">
       <table class="simple">
         <thead>
@@ -359,18 +359,41 @@
         </thead>
         <tbody>
           @for (l of locations() ?? []; track l.id) {
-            <tr>
+            @let open = openLocation() === l.id;
+            <tr [class.open-row]="open">
               <td>
-                @if (l.name) {
-                  {{ l.name }}
-                } @else {
-                  <span class="muted">ไม่ระบุสถานที่</span>
-                }
+                <button type="button" class="row-toggle" [attr.aria-expanded]="open" (click)="toggleLocation(l.id)">
+                  <mat-icon>{{ open ? 'expand_more' : 'chevron_right' }}</mat-icon>
+                  @if (l.name) {
+                    {{ l.name }}
+                  } @else {
+                    <span class="muted">ไม่ระบุสถานที่</span>
+                  }
+                </button>
               </td>
               <td class="num">{{ l.materials | number }}</td>
               <td class="num">{{ l.quantity | number }}</td>
               <td class="num">{{ l.value | number: '1.0-0' }}</td>
             </tr>
+            @if (open) {
+              @for (m of locationMaterials() ?? []; track m.id) {
+                <tr class="sub-row">
+                  <td>
+                    <a [routerLink]="['/materials', m.id]">{{ m.name }}</a>
+                    <div class="muted">{{ detail(m) }}</div>
+                  </td>
+                  <td></td>
+                  <td class="num nowrap">{{ m.quantity | number }} {{ m.unit }}</td>
+                  <td class="num">{{ m.value | number: '1.0-0' }}</td>
+                </tr>
+              } @empty {
+                <tr class="sub-row">
+                  <td colspan="4" class="empty">
+                    {{ locationMaterials() === undefined ? 'กำลังโหลด...' : 'ไม่มีของที่สถานที่นี้' }}
+                  </td>
+                </tr>
+              }
+            }
           } @empty {
             <tr>
               <td colspan="4" class="empty">

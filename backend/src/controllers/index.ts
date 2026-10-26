@@ -199,6 +199,11 @@ export const dashboards = {
   async byLocation(_req: Request, res: Response) {
     ok(res, await dashboard.byLocation());
   },
+  /** `:id` = "none" for stock with no location. */
+  async locationMaterials(req: Request, res: Response) {
+    const id = String(req.params['id']);
+    ok(res, await dashboard.locationMaterials(id === 'none' ? null : id));
+  },
   async exportXlsx(_req: Request, res: Response) {
     res
       .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

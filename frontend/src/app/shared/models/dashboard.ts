@@ -100,6 +100,13 @@ export interface LocationStock {
   value: number;
 }
 
+/** One material at a location: `GET /dashboard/by-location/:id/materials` (`:id` = "none" for no location). */
+export interface LocationMaterial extends MaterialBrief {
+  /** Pieces at this location only. */
+  quantity: number;
+  value: number;
+}
+
 /** Last 12 months, oldest first. Pieces withdrawn (reversed withdrawals excluded). */
 export interface MonthlyWithdrawals {
   /** YYYY-MM (Bangkok time). */

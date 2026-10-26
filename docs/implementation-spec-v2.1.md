@@ -350,6 +350,7 @@ export class AppError extends Error {
 | | GET | `/dashboard/monthly-withdrawals` | ADMIN, STAFF | ไม่มี query · ดู §6.6 |
 | | GET | `/dashboard/by-department` | ADMIN, STAFF | `days` ถ้าไม่ส่งหมายถึงทั้งหมด · ดู §6.7 |
 | | GET | `/dashboard/by-location` | ADMIN, STAFF | ไม่มี query · ดู §6.8 |
+| | GET | `/dashboard/by-location/:id/materials` | ADMIN, STAFF | `:id` = `none` สำหรับไม่ระบุสถานที่ · ดู §6.8 |
 | | GET | `/dashboard/export` | ADMIN, STAFF | ไฟล์ `.xlsx` · ดู §6.9 |
 
 Filter สต็อกต่ำเทียบสอง column จึงใช้ field reference ของ Prisma:
@@ -617,6 +618,8 @@ Response: `DepartmentUsage[]` = `{ id, name, withdrawalCount, quantity, value }`
 
 Response: `LocationStock[]` = `{ id, name, materials, quantity, value }`
 
+`GET /dashboard/by-location/:id/materials` (`:id` = `none` สำหรับไม่ระบุสถานที่): วัสดุที่เก็บอยู่ที่สถานที่นั้น นับชิ้นแบบเดียวกัน เรียงจำนวนชิ้นมากไปน้อย รวมแล้วเท่ากับแถวของสถานที่นั้น · Response: `LocationMaterial[]` = `{ id, code, name, brand, model, unit, quantity, value }` · FE กดชื่อสถานที่แล้วกางรายการใต้แถว (เปิดได้ทีละสถานที่)
+
 ### 6.9 `GET /dashboard/export` (ส่งออก Excel)
 
 ไฟล์ `dashboard-YYYY-MM-DD.xlsx` 7 ชีต: สรุป (KPI + มูลค่าตามประเภท), ควรสั่งซื้อ, จัดซื้อตามปีงบ, เบิกรายเดือน, แยกตามหน่วยงาน (365 วันล่าสุด), แยกตามสถานที่เก็บ, ไม่เคยถูกเบิก · ใช้ข้อมูลจาก §6.1–6.8 ชุดเดียวกับหน้าเว็บ · FE ใช้ลิงก์ `<a href download>` ธรรมดา (origin เดียวกัน cookie ส่งไปเอง)
@@ -816,7 +819,7 @@ export const routes: Routes = [
 | จัดซื้อตามปีงบ / อายุสต็อก | `/dashboard/procurement` | ตาราง ปีงบ/โครงการ · อายุ · รับเข้า · % ที่เบิกไป (แถบ CSS) · คงเหลือ · แถวที่อายุ ≥ 3 ปีและยังมีของเป็นสีส้ม |
 | แนวโน้มการเบิกรายเดือน | `/dashboard/monthly-withdrawals` | แท่งแนวตั้ง CSS 12 เดือน เดือนละ 2 แท่ง (ปีนี้ / ปีก่อน) |
 | การเบิกแยกตามหน่วยงานที่ใช้ | `/dashboard/by-department` | ตัวเลือก 90 วัน / 1 ปี / ทั้งหมด · กดชื่อหน่วยงานไปหน้าประวัติที่กรองไว้ |
-| สต็อกแยกตามสถานที่เก็บ | `/dashboard/by-location` | สถานที่ · จำนวนวัสดุ · ชิ้น · มูลค่า |
+| สต็อกแยกตามสถานที่เก็บ | `/dashboard/by-location` | สถานที่ · จำนวนวัสดุ · ชิ้น · มูลค่า · กดชื่อสถานที่เพื่อกางรายการวัสดุ (`/dashboard/by-location/:id/materials`) |
 | ปุ่ม "ส่งออก Excel" | `/dashboard/export` | หัวหน้า Dashboard |
 | รายการเบิกล่าสุด | `/inventory/history?type=OUT&limit=10` | ใช้ endpoint ประวัติเดิม ตัดรายการยกเลิกรับเข้าออก · ลิงก์ "ดูทั้งหมด" ไปหน้าประวัติ |
 

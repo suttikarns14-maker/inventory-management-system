@@ -221,22 +221,26 @@ export function byDepartment(days: number | undefined) {
     ORDER BY quantity DESC, d.name NULLS LAST`;
 }
 
+/** In-stock quantity per (material, location): SERIAL units where each unit is, other materials at the material's location. */
+const STOCK_BY_LOCATION = Prisma.sql`
+  WITH stock AS (
+    SELECT u.material_id, u.storage_location_id AS location_id, COUNT(*) AS qty
+    FROM material_units u WHERE u.status = 'IN_STOCK'
+    GROUP BY 1, 2
+    UNION ALL
+    SELECT m.id, m.storage_location_id, m.current_quantity
+    FROM materials m WHERE m.tracking_type = 'QUANTITY' AND m.current_quantity > 0
+  )`;
+
 /**
- * Stock per storage location: SERIAL units where each unit is, other materials at the material's
- * location. Latest purchase price, so the total matches the summary's stock value. No location = last.
+ * Stock per storage location (see STOCK_BY_LOCATION). Latest purchase price, so the total matches
+ * the summary's stock value. No location = last.
  */
 export function byLocation() {
   return prisma.$queryRaw<
     { id: string | null; name: string | null; materials: number; quantity: number; value: number }[]
   >`
-    WITH stock AS (
-      SELECT u.material_id, u.storage_location_id AS location_id, COUNT(*) AS qty
-      FROM material_units u WHERE u.status = 'IN_STOCK'
-      GROUP BY 1, 2
-      UNION ALL
-      SELECT m.id, m.storage_location_id, m.current_quantity
-      FROM materials m WHERE m.tracking_type = 'QUANTITY' AND m.current_quantity > 0
-    )
+    ${STOCK_BY_LOCATION}
     SELECT l.id, l.name,
            COUNT(DISTINCT s.material_id)::int AS materials,
            SUM(s.qty)::int AS quantity,
@@ -248,6 +252,23 @@ export function byLocation() {
     WHERE m.status = 'ACTIVE'
     GROUP BY l.id
     ORDER BY l.id IS NULL, quantity DESC, l.name`;
+}
+
+/** What is stored at one location (null = no location), most pieces first. Rows add up to that location's byLocation row. */
+export function locationMaterials(locationId: string | null) {
+  return prisma.$queryRaw<
+    { id: string; code: string; name: string; brand: string | null; model: string | null; unit: string; quantity: number; value: number }[]
+  >`
+    ${STOCK_BY_LOCATION}
+    SELECT m.id, m.code, m.name, m.brand, m.model, m.unit,
+           SUM(s.qty)::int AS quantity,
+           COALESCE(SUM(s.qty * p.price), 0)::float8 AS value
+    FROM stock s
+    JOIN materials m ON m.id = s.material_id
+    LEFT JOIN LATERAL (${LATEST_PRICE}) p ON true
+    WHERE m.status = 'ACTIVE' AND s.location_id IS NOT DISTINCT FROM ${locationId}::text
+    GROUP BY m.id
+    ORDER BY quantity DESC, m.code`;
 }
 
 /** Pieces withdrawn in each of the last 12 Bangkok months (oldest first), next to the same month a year earlier. */

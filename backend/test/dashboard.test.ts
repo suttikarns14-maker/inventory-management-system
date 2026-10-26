@@ -173,6 +173,12 @@ describe('dashboard (spec §6)', () => {
       { id: l2.id, name: 'ห้อง 2', materials: 1, quantity: 2, value: 200 },
       { id: null, name: null, materials: 1, quantity: 3, value: 0 }, // pens: no location, last
     ]);
+
+    // What is stored there: RAM's own location is ห้อง 1, but its units are in ห้อง 2.
+    const brief = (rows: { code: string; quantity: number; value: number }[]) => rows.map((r) => [r.code, r.quantity, r.value]);
+    expect(brief((await admin.get(`/api/v1/dashboard/by-location/${l1.id}/materials`)).body.data)).toEqual([['OFF-001', 30, 150]]);
+    expect(brief((await admin.get(`/api/v1/dashboard/by-location/${l2.id}/materials`)).body.data)).toEqual([['HW-001', 2, 200]]);
+    expect(brief((await admin.get('/api/v1/dashboard/by-location/none/materials')).body.data)).toEqual([['OFF-002', 3, 0]]);
   });
 
   it('exports the dashboard as an Excel workbook (ADMIN, STAFF)', async () => {

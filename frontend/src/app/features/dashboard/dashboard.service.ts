@@ -4,6 +4,7 @@ import { ApiSuccess } from '../../shared/models/api';
 import {
   DashboardSummary,
   DepartmentUsage,
+  LocationMaterial,
   LocationStock,
   MonthlyWithdrawals,
   ProcurementRow,
@@ -52,6 +53,13 @@ export class DashboardService {
 
   byLocation() {
     return this.http.get<ApiSuccess<LocationStock[]>>(`${API}/dashboard/by-location`).pipe(unwrap());
+  }
+
+  /** `id` null = stock with no location. */
+  locationMaterials(id: string | null) {
+    return this.http
+      .get<ApiSuccess<LocationMaterial[]>>(`${API}/dashboard/by-location/${id ?? 'none'}/materials`)
+      .pipe(unwrap());
   }
 
   unused(days: number | null) {

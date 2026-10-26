@@ -76,6 +76,7 @@ export function apiRouter(): Router {
   r.get('/dashboard/monthly-withdrawals', staff, dashboards.monthlyWithdrawals);
   r.get('/dashboard/by-department', staff, dashboards.byDepartment);
   r.get('/dashboard/by-location', staff, dashboards.byLocation);
+  r.get('/dashboard/by-location/:id/materials', staff, dashboards.locationMaterials);
   r.get('/dashboard/export', staff, dashboards.exportXlsx);
 
   return r;

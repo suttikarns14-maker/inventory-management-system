@@ -5,7 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
-import { catchError, combineLatest, map, of, OperatorFunction, switchMap } from 'rxjs';
+import { catchError, combineLatest, map, of, OperatorFunction, startWith, switchMap } from 'rxjs';
 import { MaterialBrief, ProcurementRow, TopWithdrawnSort } from '../../shared/models/dashboard';
 import { StockTransaction } from '../../shared/models/transaction';
 import { InventoryService } from '../inventory/inventory.service';
@@ -133,6 +133,24 @@ export class DashboardPage {
   protected readonly locations = toSignal(this.dashboard.byLocation().pipe(this.safe([])), {
     initialValue: undefined,
   });
+
+  /** Location row that is unfolded (its id, or null for "no location"); undefined = none open. */
+  protected readonly openLocation = signal<string | null | undefined>(undefined);
+  protected readonly locationMaterials = toSignal(
+    toObservable(this.openLocation).pipe(
+      switchMap((id) =>
+        id === undefined
+          ? of(undefined)
+          : // startWith: don't show the previous location's list under the new row while loading
+            this.dashboard.locationMaterials(id).pipe(this.safe([]), startWith(undefined)),
+      ),
+    ),
+    { initialValue: undefined },
+  );
+
+  protected toggleLocation(id: string | null): void {
+    this.openLocation.update((open) => (open === id ? undefined : id));
+  }
 
   /** Same-origin link: the session cookie goes along, the browser saves the file. */
   protected readonly exportUrl = `${API}/dashboard/export`;
