@@ -134,6 +134,155 @@
   </div>
 </section>
 
+<section class="card spaced">
+  <h2>จัดซื้อตามปีงบ / อายุสต็อก</h2>
+  <p class="muted hint">
+    นับเป็นรายชิ้น · มูลค่าคิดจากราคาในใบรับเข้าของชิ้นนั้น · ไม่นับใบรับเข้าที่ยกเลิกแล้ว
+  </p>
+  <div class="table-wrap scroll-box">
+    <table class="simple">
+      <thead>
+        <tr>
+          <th>ปีงบ / โครงการ</th>
+          <th class="num">อายุ</th>
+          <th class="num">รับเข้า</th>
+          <th class="num">มูลค่าที่ซื้อ (บาท)</th>
+          <th class="used-col">เบิกไปแล้ว</th>
+          <th class="num">คงเหลือ</th>
+          <th class="num">มูลค่าคงเหลือ (บาท)</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (p of procurement() ?? []; track p.fiscalYear + '|' + p.projectName) {
+          @let age = currentFiscalYear - p.fiscalYear;
+          <tr [class.row-warn]="age >= 3 && p.remainingQty > 0">
+            <td>
+              <div>ปีงบ {{ p.fiscalYear }}</div>
+              <div class="muted">{{ p.projectName ?? 'ไม่ระบุโครงการ' }}</div>
+            </td>
+            <td class="num nowrap">{{ age < 1 ? 'ปีนี้' : age + ' ปี' }}</td>
+            <td class="num">{{ p.receivedQty | number }} ชิ้น</td>
+            <td class="num">
+              @if (p.unpricedQty === p.receivedQty) {
+                <span class="muted">ไม่มีราคา</span>
+              } @else {
+                {{ p.receivedValue | number: '1.0-0' }}
+                @if (p.unpricedQty) {
+                  <div class="muted">ไม่มีราคา {{ p.unpricedQty | number }} ชิ้น</div>
+                }
+              }
+            </td>
+            <td class="used-col">
+              <div class="bar-label">
+                <span></span>
+                <span class="num">{{ usedPercent(p) }}%</span>
+              </div>
+              <div class="bar-track"><div class="bar" [style.width.%]="usedPercent(p)"></div></div>
+            </td>
+            <td class="num">{{ p.remainingQty | number }} ชิ้น</td>
+            <td class="num">
+              @if (p.unpricedQty === p.receivedQty) {
+                <span class="muted">-</span>
+              } @else {
+                {{ p.remainingValue | number: '1.0-0' }}
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="7" class="empty">
+              {{ procurement() === undefined ? 'กำลังโหลด...' : 'ยังไม่มีข้อมูลการรับเข้า' }}
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="muted legend">แถวพื้นสีส้ม: ซื้อมาตั้งแต่ 3 ปีก่อนขึ้นไปและยังเหลือในคลัง อาจตกรุ่นหรือหมดประกัน</p>
+</section>
+
+<div class="two-col spaced">
+  <section class="card">
+    <div class="card-head">
+      <h2>แนวโน้มการเบิกรายเดือน</h2>
+      <span class="legend-keys">
+        <span><i class="key key-now"></i>12 เดือนล่าสุด</span>
+        <span><i class="key key-prev"></i>ปีก่อน</span>
+      </span>
+    </div>
+    <p class="muted hint">จำนวนชิ้นที่เบิก ไม่นับรายการที่ยกเลิก</p>
+    <div class="month-chart" role="list">
+      @for (m of monthly() ?? []; track m.month) {
+        <div
+          class="month"
+          role="listitem"
+          [attr.aria-label]="monthLabel(m.month) + ': ' + m.quantity + ' ชิ้น, ปีก่อน ' + m.previousYearQuantity + ' ชิ้น'"
+          [title]="monthLabel(m.month) + '\n' + m.quantity + ' ชิ้น (ปีก่อน ' + m.previousYearQuantity + ')'"
+        >
+          <span class="month-value">{{ m.quantity }}</span>
+          <div class="month-bars">
+            <div class="mbar key-prev" [style.height]="barHeight(m.previousYearQuantity)"></div>
+            <div class="mbar key-now" [style.height]="barHeight(m.quantity)"></div>
+          </div>
+          <!-- Month only, so 12 labels fit on a phone; the year shows where it starts. -->
+          <span class="month-label">
+            {{ monthLabel(m.month, false) }}
+            @if ($first || m.month.endsWith('-01')) {
+              <br />{{ (+m.month.slice(0, 4) + 543) % 100 }}
+            }
+          </span>
+        </div>
+      } @empty {
+        <p class="empty">{{ monthly() === undefined ? 'กำลังโหลด...' : 'ยังไม่มีข้อมูล' }}</p>
+      }
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>รายการเบิกล่าสุด</h2>
+      <a routerLink="/inventory/history" [queryParams]="{ type: 'OUT' }">ดูทั้งหมด</a>
+    </div>
+    <div class="table-wrap scroll-box">
+      <table class="simple">
+        <thead>
+          <tr>
+            <th class="nowrap">วันที่</th>
+            <th>ผู้เบิก / หน่วยงานที่ใช้</th>
+            <th>วัสดุ</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of recent() ?? []; track t.id) {
+            <tr [class.reversed]="t.reversedBy">
+              <td class="nowrap">
+                {{ t.createdAt | date: 'd MMM y' }}
+                <div class="muted">{{ t.referenceNo }}</div>
+              </td>
+              <td>
+                {{ t.requesterName }}
+                <div class="muted">{{ t.usingDepartment?.name ?? 'ไม่ระบุหน่วยงาน' }}</div>
+              </td>
+              <td>
+                {{ itemsText(t) }}
+                @if (t.reversedBy) {
+                  <div class="muted">ยกเลิกแล้ว ({{ t.reversedBy.referenceNo }})</div>
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="3" class="empty">
+                {{ recent() === undefined ? 'กำลังโหลด...' : 'ยังไม่มีรายการเบิก' }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
 <div class="two-col">
   <section class="card">
     <div class="card-head">

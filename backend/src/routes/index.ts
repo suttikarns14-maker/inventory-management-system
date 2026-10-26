@@ -72,6 +72,8 @@ export function apiRouter(): Router {
   r.get('/dashboard/reorder-suggestions', staff, dashboards.reorder);
   r.get('/dashboard/top-withdrawn', staff, dashboards.topWithdrawn);
   r.get('/dashboard/unused', staff, dashboards.unused);
+  r.get('/dashboard/procurement', staff, dashboards.procurement);
+  r.get('/dashboard/monthly-withdrawals', staff, dashboards.monthlyWithdrawals);
 
   return r;
 }

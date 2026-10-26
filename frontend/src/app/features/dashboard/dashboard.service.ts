@@ -3,6 +3,8 @@ import { inject, Injectable } from '@angular/core';
 import { ApiSuccess } from '../../shared/models/api';
 import {
   DashboardSummary,
+  MonthlyWithdrawals,
+  ProcurementRow,
   ReorderSuggestion,
   TopWithdrawn,
   TopWithdrawnSort,
@@ -27,6 +29,16 @@ export class DashboardService {
   topWithdrawn(query: { from: string; to: string; sortBy: TopWithdrawnSort; limit?: number }) {
     return this.http
       .get<ApiSuccess<TopWithdrawn[]>>(`${API}/dashboard/top-withdrawn`, { params: toParams(query) })
+      .pipe(unwrap());
+  }
+
+  procurement() {
+    return this.http.get<ApiSuccess<ProcurementRow[]>>(`${API}/dashboard/procurement`).pipe(unwrap());
+  }
+
+  monthlyWithdrawals() {
+    return this.http
+      .get<ApiSuccess<MonthlyWithdrawals[]>>(`${API}/dashboard/monthly-withdrawals`)
       .pipe(unwrap());
   }
 

@@ -186,4 +186,10 @@ export const dashboards = {
   async unused(req: Request, res: Response) {
     ok(res, await dashboard.unused(dto.unusedSchema.parse(req.query).days));
   },
+  async procurement(_req: Request, res: Response) {
+    ok(res, await dashboard.procurement());
+  },
+  async monthlyWithdrawals(_req: Request, res: Response) {
+    ok(res, await dashboard.monthlyWithdrawals());
+  },
 };

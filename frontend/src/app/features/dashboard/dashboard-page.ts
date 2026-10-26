@@ -4,8 +4,10 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
-import { catchError, combineLatest, of, OperatorFunction, switchMap } from 'rxjs';
-import { MaterialBrief, TopWithdrawnSort } from '../../shared/models/dashboard';
+import { catchError, combineLatest, map, of, OperatorFunction, switchMap } from 'rxjs';
+import { MaterialBrief, ProcurementRow, TopWithdrawnSort } from '../../shared/models/dashboard';
+import { StockTransaction } from '../../shared/models/transaction';
+import { InventoryService } from '../inventory/inventory.service';
 import { Notify } from '../../shared/services/notify';
 import { bangkokDate, daysAgo } from '../../shared/utils/date';
 import { DashboardService } from './dashboard.service';
@@ -64,6 +66,57 @@ export class DashboardPage {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
   })();
+
+  // ---- procurement by fiscal year / stock age ----
+  protected readonly procurement = toSignal(this.dashboard.procurement().pipe(this.safe([])), {
+    initialValue: undefined,
+  });
+  /** Thai fiscal year starts 1 October. */
+  protected readonly currentFiscalYear = (() => {
+    const [y, m] = bangkokDate().split('-').map(Number) as [number, number];
+    return y + 543 + (m >= 10 ? 1 : 0);
+  })();
+
+  protected usedPercent(p: ProcurementRow): number {
+    return p.receivedQty ? Math.round(((p.receivedQty - p.remainingQty) / p.receivedQty) * 100) : 0;
+  }
+
+  // ---- monthly trend ----
+  protected readonly monthly = toSignal(this.dashboard.monthlyWithdrawals().pipe(this.safe([])), {
+    initialValue: undefined,
+  });
+  private readonly monthlyMax = computed(() =>
+    Math.max(1, ...(this.monthly() ?? []).flatMap((m) => [m.quantity, m.previousYearQuantity])),
+  );
+
+  protected barHeight(value: number): string {
+    return `${(value / this.monthlyMax()) * 100}%`;
+  }
+
+  /** "2026-10" -> "ต.ค. 69" (or "ต.ค." with `withYear` false) */
+  protected monthLabel(month: string, withYear = true): string {
+    return new Intl.DateTimeFormat('th-TH', {
+      month: 'short',
+      year: withYear ? '2-digit' : undefined,
+      timeZone: 'UTC',
+    }).format(new Date(`${month}-01T00:00:00Z`));
+  }
+
+  // ---- recent withdrawals ----
+  protected readonly recent = toSignal(
+    inject(InventoryService)
+      .history({ type: 'OUT', limit: 10 })
+      .pipe(
+        // A cancelled receipt is also an OUT; it is not a withdrawal.
+        map((p) => p.items.filter((t) => !t.reversalOf)),
+        this.safe([]),
+      ),
+    { initialValue: undefined },
+  );
+
+  protected itemsText(t: StockTransaction): string {
+    return t.items.map((i) => `${i.material.name} ${i.quantity} ${i.material.unit}`).join(', ');
+  }
 
   // ---- unused ----
   /** null = never withdrawn at all. */

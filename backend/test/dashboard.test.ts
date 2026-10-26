@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/lib/prisma.js';
-import { loginAs, out, seedBasics } from './helpers.js';
+import { depts, loginAs, out, seedBasics } from './helpers.js';
 
 let fx: Awaited<ReturnType<typeof seedBasics>>;
 beforeEach(async () => {
@@ -90,5 +90,49 @@ describe('dashboard (spec §6)', () => {
     // minStock 10 + 3/90 per day * 30 days = 11 after rounding up
     expect(list[0].suggestedQty).toBe(11);
     expect(list.map((r: { code: string }) => r.code)).not.toContain('OFF-001');
+  });
+
+  it('summarises purchases per fiscal year and project, per unit at its own receipt price', async () => {
+    const admin = await loginAs('admin');
+    const ram = await prisma.material.create({
+      data: { code: 'HW-001', name: 'RAM', unit: 'ชิ้น', minStock: 0, categoryId: fx.category.id, trackingType: 'SERIAL' },
+    });
+    const receive = (serialNumbers: string[], extra: object) =>
+      admin.post('/api/v1/inventory/transactions').send({ type: 'IN', ...extra, items: [{ materialId: ram.id, serialNumbers }] });
+    const tor = (await receive(['A1', 'A2', 'A3'], { fiscalYear: 2567, projectName: 'TOR 1' })).body.data;
+    await receive(['B1', 'B2'], { fiscalYear: 2568 }); // no price
+    const wrong = (await receive(['C1'], { fiscalYear: 2568, projectName: 'ผิด' })).body.data;
+    await admin.post(`/api/v1/inventory/transactions/${wrong.id}/reverse`).send({ note: 'ผิด' });
+    await receive(['D1'], {}); // no fiscal year: falls in the current one (starts 1 Oct)
+    await prisma.stockTransactionItem.updateMany({ where: { transactionId: tor.id }, data: { unitPrice: 100 } });
+    const a1 = await prisma.materialUnit.findFirstOrThrow({ where: { serialNumber: 'A1' } });
+    await admin.post('/api/v1/inventory/transactions').send({ type: 'OUT', ...depts, requesterName: 'ก', items: [{ materialId: ram.id, units: [{ unitId: a1.id }] }] });
+
+    const now = new Date(Date.now() + 7 * 3_600_000); // Bangkok
+    const currentFy = now.getUTCFullYear() + 543 + (now.getUTCMonth() >= 9 ? 1 : 0);
+    const rows = (await admin.get('/api/v1/dashboard/procurement')).body.data;
+    expect(rows).toEqual([
+      { fiscalYear: currentFy, projectName: null, receivedQty: 1, receivedValue: 0, unpricedQty: 1, remainingQty: 1, remainingValue: 0 },
+      { fiscalYear: 2568, projectName: null, receivedQty: 2, receivedValue: 0, unpricedQty: 2, remainingQty: 2, remainingValue: 0 },
+      { fiscalYear: 2567, projectName: 'TOR 1', receivedQty: 3, receivedValue: 300, unpricedQty: 0, remainingQty: 2, remainingValue: 200 },
+    ]);
+  });
+
+  it('compares monthly withdrawals with the same month last year', async () => {
+    const staff = await loginAs('staff');
+    const admin = await loginAs('admin');
+    await staff.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 2));
+    const old = (await staff.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 3))).body.data;
+    await prisma.stockTransaction.update({ where: { id: old.id }, data: { createdAt: new Date(Date.now() - 365 * 86_400_000) } });
+    const mistake = (await staff.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 1))).body.data;
+    await admin.post(`/api/v1/inventory/transactions/${mistake.id}/reverse`).send({ note: 'ผิด' });
+
+    const months = (await staff.get('/api/v1/dashboard/monthly-withdrawals')).body.data;
+    expect(months).toHaveLength(12);
+    const thisMonth = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 7);
+    expect(months.at(-1)).toMatchObject({ month: thisMonth, quantity: 2 });
+    // 365 days ago is last year's same month (or the one before, in a leap year): checked by the total.
+    expect(months.reduce((s: number, m: { previousYearQuantity: number }) => s + m.previousYearQuantity, 0)).toBe(3);
+    expect((await (await loginAs('user')).get('/api/v1/dashboard/monthly-withdrawals')).status).toBe(403);
   });
 });

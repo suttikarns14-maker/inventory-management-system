@@ -164,3 +164,57 @@ export function unused(days: number | undefined) {
       AND (lo.last_out_at IS NULL OR (${cutoff}::timestamptz IS NOT NULL AND lo.last_out_at < ${cutoff}::timestamptz))
     ORDER BY value DESC, lo.last_out_at ASC NULLS FIRST, m.current_quantity DESC`;
 }
+
+/**
+ * Purchases per fiscal year + project (TOR), and how much of each is still in stock (stock age).
+ * Counted per unit, each at the price on its own receipt line.
+ * ponytail: SERIAL units only (every material is SERIAL since D15); QUANTITY stock has no per-receipt trail.
+ */
+export function procurement() {
+  return prisma.$queryRaw<
+    { fiscalYear: number; projectName: string | null; receivedQty: number; receivedValue: number; unpricedQty: number; remainingQty: number; remainingValue: number }[]
+  >`
+    SELECT
+      -- A receipt saved without a year falls in the Thai fiscal year of its date (starts 1 Oct).
+      COALESCE(t.fiscal_year,
+        EXTRACT(YEAR FROM (t.created_at AT TIME ZONE 'Asia/Bangkok') + interval '3 months')::int + 543) AS "fiscalYear",
+      t.project_name AS "projectName",
+      COUNT(*)::int AS "receivedQty",
+      COALESCE(SUM(i.unit_price), 0)::float8 AS "receivedValue",
+      COUNT(*) FILTER (WHERE i.unit_price IS NULL)::int AS "unpricedQty",
+      COUNT(*) FILTER (WHERE u.status = 'IN_STOCK')::int AS "remainingQty",
+      COALESCE(SUM(i.unit_price) FILTER (WHERE u.status = 'IN_STOCK'), 0)::float8 AS "remainingValue"
+    FROM stock_transactions t
+    JOIN transaction_units tu ON tu.transaction_id = t.id
+    JOIN material_units u ON u.id = tu.unit_id
+    JOIN materials m ON m.id = u.material_id
+    JOIN stock_transaction_items i ON i.transaction_id = t.id AND i.material_id = u.material_id
+    WHERE t.type = 'IN' AND t.reversal_of_id IS NULL
+      AND NOT EXISTS (SELECT 1 FROM stock_transactions r WHERE r.reversal_of_id = t.id)
+      AND m.status = 'ACTIVE'
+    GROUP BY 1, 2
+    ORDER BY 1 DESC, 2 NULLS FIRST`;
+}
+
+/** Pieces withdrawn in each of the last 12 Bangkok months (oldest first), next to the same month a year earlier. */
+export async function monthlyWithdrawals() {
+  const [y, m] = bangkokDate().slice(0, 7).split('-').map(Number) as [number, number];
+  const monthKey = (back: number) => new Date(Date.UTC(y, m - 1 - back, 1)).toISOString().slice(0, 7);
+  const rows = await prisma.$queryRaw<{ month: string; quantity: number }[]>`
+    SELECT to_char(t.created_at AT TIME ZONE 'Asia/Bangkok', 'YYYY-MM') AS month, SUM(i.quantity)::int AS quantity
+    FROM stock_transaction_items i
+    JOIN stock_transactions t ON t.id = i.transaction_id
+    JOIN materials m ON m.id = i.material_id
+    WHERE ${REAL_WITHDRAWAL} AND m.status = 'ACTIVE'
+      AND t.created_at >= ${bangkokDayStart(`${monthKey(23)}-01`)}
+    GROUP BY 1`;
+  const qty = new Map(rows.map((r) => [r.month, r.quantity]));
+  return Array.from({ length: 12 }, (_, i) => {
+    const back = 11 - i;
+    return {
+      month: monthKey(back),
+      quantity: qty.get(monthKey(back)) ?? 0,
+      previousYearQuantity: qty.get(monthKey(back + 12)) ?? 0,
+    };
+  });
+}
