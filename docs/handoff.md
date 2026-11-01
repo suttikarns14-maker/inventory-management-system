@@ -1,7 +1,7 @@
 # ส่งต่องานสำหรับ session ถัดไป
 
 > **วิธีใช้:** เริ่ม session ใหม่แล้วพิมพ์ว่า "อ่าน docs/handoff.md แล้วทำต่อ" · ไฟล์นี้สรุปแค่สิ่งที่ `CLAUDE.md` และ `docs/status.md` ไม่ได้บอก ไม่ต้องย้อนอ่านประวัติแชทเก่า
-> **อัปเดตล่าสุด:** 2026-10-26
+> **อัปเดตล่าสุด:** 2026-11-02 (ย้ายมาเครื่องใหม่)
 
 ## 1. สถานะตอนนี้
 
@@ -12,6 +12,7 @@
 - **งานก่อนหน้า (2026-10-20 ถึง 26):** import `IT_Inventory.xlsx` ฉบับใหม่ · หน่วยงานที่เบิกเลือกได้ทั้ง MAIN/SUB · ทุกวัสดุเป็นรายชิ้นพร้อม S/N ชั่วคราว (D15) · การ์ด KPI กดได้ + ตัวกรอง "เฉพาะของหมด"
 - **DB จริง** (หลัง import 2026-10-25): วัสดุ 169 (SERIAL ทั้งหมด) · ชิ้น 4,676 (อยู่ในคลัง 3,175 · เบิกแล้ว 1,501) · S/N ชั่วคราว 2,102 · รายการรับเข้า 7 · รายการเบิก 406 (มีหน่วยงานครบ) · หน่วยงาน 289 · มูลค่าคลัง ≈ 2.35 ล้านบาท
 - **ไฟล์สำรอง** (`backend/backups/`, ไม่ขึ้น Git): `before-wipe-20261020-225729.sql` (ข้อมูลชุดเก่า) · `before-import-20261025-235618.sql` (DB ว่าง มีแค่ Admin) · `before-drop-material-status-20261026-230512.sql` (ก่อนลบคอลัมน์ status)
+- **ย้ายเครื่อง (2026-11-01):** กู้ DB จาก `backups/move-20261101-223402.sql` ลงเครื่องใหม่แล้ว ได้ตัวเลขตรงกับข้างบน (วัสดุ 169 · ชิ้น 4,676 · รายการ 413 · ผู้ใช้ 1) · migration ครบ 3 ตัว (`migrate status` = up to date)
 - **server:** Claude เปิด BE (3000) และ FE (4200) ไว้เบื้องหลังใน session นี้ · Docker Desktop เปิดอยู่
 - **บัญชีในระบบ:** มีแค่ `Admin` รหัสผ่านอยู่ใน `backend/.env` (`SEED_ADMIN_PASSWORD`) **ห้ามพิมพ์ค่านี้ในแชท โค้ด หรือเอกสาร**
 
@@ -43,7 +44,10 @@
 | เรื่อง | วิธีที่ใช้ได้ |
 |---|---|
 | Git ใน Bash tool | ใส่ `export PATH="/c/Program Files/Git/cmd:$PATH"` ก่อนใช้ `git` |
-| Docker Desktop | มักปิดอยู่ตอนเริ่ม session · เปิดด้วย PowerShell `Start-Process "C:\Users\user\AppData\Local\Programs\DockerDesktop\Docker Desktop.exe"` แล้วรอ `docker info` · container `inventory_db` เปิดเองเมื่อ Docker พร้อม (`docker start` อาจแจ้งว่าพอร์ตถูกใช้ ซึ่งหมายถึงเปิดอยู่แล้ว) · query อ่านอย่างเดียว: `docker exec inventory_db psql -U postgres -d inventory_db -c "..."` |
+| `docker` ไม่อยู่ใน PATH (เครื่องใหม่) | Docker Desktop ติดตั้งที่ `C:\Users\Suttikarn\AppData\Local\Programs\DockerDesktop\` · ใน PowerShell ให้ใส่ `$env:Path = "C:\Users\Suttikarn\AppData\Local\Programs\DockerDesktop\resources\bin;$env:Path"` ก่อนใช้ `docker` (ต้องใส่ทุกคำสั่ง เพราะ shell state ไม่ค้าง) · `npm run db:up` ก็ต้องใช้ PATH นี้ |
+| `npm` / `npx` ใน PowerShell | execution policy บล็อก `npm.ps1` (ตั้งค่าเองไม่ได้ ระบบตรวจสิทธิ์บล็อก `Set-ExecutionPolicy`) ให้ใช้ `npm.cmd` / `npx.cmd` แทน · ใน Bash tool ใช้ `npm` ได้ตามปกติ |
+| `claude` CLI | ติดตั้งด้วย `npm.cmd install -g @anthropic-ai/claude-code` และลบ `%APPDATA%\npm\claude.ps1` เพื่อให้ PowerShell ใช้ `claude.cmd` (ถ้าอัปเดตแล้ว error เรื่อง script ให้ลบซ้ำ) · plugin: superpowers, ponytail (ยังไม่ได้ตั้งค่า 4 ค่า), frontend-design · MCP `chrome-devtools` ระดับ user (บน Windows ต้องเป็น `cmd /c npx ...`) |
+| Docker Desktop | มักปิดอยู่ตอนเริ่ม session · เปิดด้วย PowerShell `Start-Process "C:\Users\Suttikarn\AppData\Local\Programs\DockerDesktop\Docker Desktop.exe"` แล้วรอ `docker info` · container `inventory_db` เปิดเองเมื่อ Docker พร้อม (`docker start` อาจแจ้งว่าพอร์ตถูกใช้ ซึ่งหมายถึงเปิดอยู่แล้ว) · query อ่านอย่างเดียว: `docker exec inventory_db psql -U postgres -d inventory_db -c "..."` |
 | heredoc ใน Bash tool | พังบ่อยเมื่อมี backtick หรือ `'` ปนอยู่ ให้ใช้ Write tool เขียนไฟล์ หรือเขียน script `.cjs` ใน scratchpad แล้วรันด้วย `node` · **ห้ามเขียน `cat > file` โดยไม่มี heredoc** (ค้างรอ stdin จนหมดเวลา เคยเกิดซ้ำใน session นี้) |
 | แก้ไฟล์ด้วย script | ใช้ `s.replace(a, () => b)` **ห้าม** `s.replace(a, b)` เพราะ `$'` `$&` ในข้อความใหม่ (เช่น regex SQL `'^[0-9]+$'`) จะถูกตีความ และวางส่วนท้ายไฟล์ซ้ำเข้าไป · ตรวจ `git diff --stat` หลังแก้เสมอ |
 | ไฟล์ CRLF | ไฟล์ที่ git checkout มาเป็น CRLF ถ้าแก้ด้วย script ให้ `.replaceAll('\r\n', '\n')` ก่อนค้นหาข้อความ · warning "LF will be replaced by CRLF" ตอน commit ไม่ต้องสนใจ |
