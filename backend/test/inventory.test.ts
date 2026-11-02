@@ -186,3 +186,12 @@ describe('history', () => {
     expect((await admin.patch(`/api/v1/inventory/transactions/${receipt.id}/departments`).send({ usingDepartmentId: fx.sub.id })).status).toBe(400);
   });
 });
+
+describe('request body', () => {
+  it('rejects an oversized body with 400, not 500', async () => {
+    const admin = await loginAs('admin');
+    const res = await admin.post('/api/v1/inventory/transactions').send({ type: 'OUT', note: 'x'.repeat(600_000), items: [] });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+});

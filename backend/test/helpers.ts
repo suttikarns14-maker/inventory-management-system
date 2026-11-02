@@ -11,7 +11,7 @@ const hash = bcrypt.hashSync(PASSWORD, 4); // low cost: test speed only
 /** Empties every table so each test starts from a known state. */
 export async function resetDb(): Promise<void> {
   await prisma.$executeRawUnsafe(`
-    TRUNCATE transaction_units, material_units, stock_transaction_items, stock_transactions,
+    TRUNCATE withdrawal_request_items, withdrawal_requests, transaction_units, material_units, stock_transaction_items, stock_transactions,
              reference_counters, materials, categories, departments, buildings, storage_locations,
              users RESTART IDENTITY CASCADE`);
 }
