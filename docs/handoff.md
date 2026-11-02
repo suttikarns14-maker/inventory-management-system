@@ -66,7 +66,7 @@
 
 ## 5. วิธีทดสอบที่ใช้มา
 
-- **BE:** `cd backend && npm test` ใช้ DB `inventory_test` (ห้ามชี้ไป DB จริง) ตอนนี้ **65 ข้อ** · test ที่ต้องการรายการเบิกใช้ `withdraw(username, body)` ใน `test/helpers.ts` (สร้างคำขอแล้วให้คนอื่นอนุมัติ)
+- **BE:** `cd backend && npm test` ใช้ DB `inventory_test` (ห้ามชี้ไป DB จริง) ตอนนี้ **66 ข้อ** · test ที่ต้องการรายการเบิกใช้ `withdraw(username, body)` ใน `test/helpers.ts` (สร้างคำขอแล้วให้คนอื่นอนุมัติ)
 - **FE:** `cd frontend && npm test -- --watch=false` (16 ข้อ: mock + ช่องเซ็นชื่อ) และ `npx ng build`
 - **Playwright กับปุ่มที่ชื่อซ้ำบางส่วน:** `getByRole('link', { name: 'อนุมัติ' })` จะเจอเมนู "คำขอเบิก" ที่มีป้าย "รออนุมัติ" ด้วย ให้ใส่ `exact: true`
 - **ตรวจไฟล์ Excel ก่อน import (อ่านอย่างเดียว):** script ชั่วคราวใน `backend/` เรียก `previewInitialImport(admin, buffer)` แล้วพิมพ์ `summary`, `unmatched`, `issues` (DB ต้องไม่มีวัสดุ ไม่งั้นเรียกไม่ได้) · ตรวจเพิ่มเอง: หัวคอลัมน์ครบไหม (ถ้าชื่อไม่ตรง ระบบไม่ error แต่ข้อมูลคอลัมน์นั้นจะหายไปเฉยๆ เช่น "สถานะการเบิก"), S/N ซ้ำข้ามวัสดุ, แถวที่ไม่มีประเภท
