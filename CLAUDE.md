@@ -47,7 +47,7 @@ Layered architecture: `routes → middlewares → controllers → services → P
 
 ## Domain model
 
-`User` (`username` ใช้ login ไม่ใช่ email · ไม่สนตัวพิมพ์เล็กใหญ่ · role: ADMIN | STAFF | USER, `isActive`), `Department` (MAIN/SUB), `Building`, `StorageLocation` (ปิดใช้งานแทนการลบ), `MaterialUnit` (S/N ของวัสดุ `SERIAL`, status IN_STOCK/ISSUED/VOID, `isTempSerial`), `TransactionUnit` (S/N ไหนอยู่ในรายการไหน + remark), `Category`, `Material` (code unique, `currentQuantity`, `minStock`, `location` · ไม่มีสถานะเปิด/ปิดใช้งาน (D16)), `StockTransaction` (type IN/OUT, `referenceNo` unique เช่น `TXN-20260927-001`, `reversalOfId` ใช้ยกเลิกรายการ), `StockTransactionItem` (quantity, `unitPrice` Decimal(10,2) ใช้เฉพาะ IN), `ReferenceCounter` (ตัวนับเลขอ้างอิงรายวัน, คำขอใช้ key `REQ-YYYYMMDD`), `WithdrawalRequest` (คำขอเบิก D17: status PENDING/APPROVED/REJECTED/CANCELLED, ลายเซ็นผู้เบิก/ผู้อนุมัติเป็น PNG data URL, `transactionId` ของรายการ OUT ที่อนุมัติแล้ว) + `WithdrawalRequestItem` (`quantity`, `approvedQuantity`) ดู schema เต็มในสเปก §3
+`User` (`username` ใช้ login ไม่ใช่ email · ไม่สนตัวพิมพ์เล็กใหญ่ · role: ADMIN | STAFF | USER, `isActive`), `Department` (MAIN/SUB), `Building`, `StorageLocation` (ปิดใช้งานแทนการลบ), `MaterialUnit` (S/N ของวัสดุ `SERIAL`, status IN_STOCK/ISSUED/VOID, `isTempSerial`), `TransactionUnit` (S/N ไหนอยู่ในรายการไหน + remark), `Category`, `Material` (code unique, `currentQuantity`, `minStock`, `location` · ไม่มีสถานะเปิด/ปิดใช้งาน (D16)), `StockTransaction` (type IN/OUT, `referenceNo` unique เช่น `TXN-20260927-001`, `reversalOfId` ใช้ยกเลิกรายการ, `returnOfId` รายการรับคืนชี้ใบเบิกเดิม D18), `StockTransactionItem` (quantity, `unitPrice` Decimal(10,2) ใช้เฉพาะ IN), `ReferenceCounter` (ตัวนับเลขอ้างอิงรายวัน, คำขอใช้ key `REQ-YYYYMMDD`), `WithdrawalRequest` (คำขอเบิก D17: status PENDING/APPROVED/REJECTED/CANCELLED, ลายเซ็นผู้เบิก/ผู้อนุมัติเป็น PNG data URL, `transactionId` ของรายการ OUT ที่อนุมัติแล้ว) + `WithdrawalRequestItem` (`quantity`, `approvedQuantity`) ดู schema เต็มในสเปก §3
 
 ## Roles
 
@@ -59,6 +59,7 @@ Layered architecture: `routes → middlewares → controllers → services → P
 | รับเข้า (IN) | ✅ | ✅ | ❌ |
 | ขอเบิก (คำขอ + เซ็น) | ✅ | ✅ | ✅ |
 | อนุมัติคำขอเบิก (ไม่ใช่ของตัวเอง) | ✅ | ✅ | ❌ |
+| รับคืน (D18) | ✅ | ✅ | ❌ |
 | ยกเลิกรายการ | ✅ | ❌ | ❌ |
 | ดูประวัติ | ทั้งหมด | ทั้งหมด | ของตัวเอง |
 | Dashboard | ✅ | ✅ | ❌ |
@@ -88,6 +89,7 @@ DB ใช้ snake_case (`@map`) ส่วนโค้ดใช้ camelCase
 - ผู้ใช้ห้ามลบ ใช้ `isActive = false` แทน
 - **วัสดุ `SERIAL`:** `currentQuantity` = จำนวน `MaterialUnit` ที่ `IN_STOCK` เสมอ อัปเดตใน DB transaction เดียวกัน · เปลี่ยนสถานะชิ้นแบบมีเงื่อนไข (`updateMany where status = ...` แล้วเช็ก `count`) · S/N ไม่ซ้ำแบบไม่สนตัวพิมพ์ (`DUPLICATE_SERIAL`) · เปลี่ยน `trackingType` ไม่ได้หลังมีรายการ
 - **เบิก = คำขอ + อนุมัติ (D17):** ผู้เบิกเซ็นส่งคำขอ (`/inventory/requests`) ยังไม่ตัดสต็อก · STAFF/ADMIN ที่ไม่ใช่ผู้ส่งและไม่ใช่ผู้เบิกอนุมัติพร้อมเซ็น · เปลี่ยนสถานะแบบมีเงื่อนไข (`updateMany where status = PENDING`) และ `applyTransaction(..., tx)` ใน `$transaction` เดียวกัน ถ้าสต็อกไม่พอคำขอยังรออยู่ · `POST /inventory/transactions` รับเฉพาะ IN
+- **รับคืน (D18):** STAFF/ADMIN บันทึก `IN` ที่มี `returnOfId` ผ่าน `applyTransaction(..., tx)` หลังล็อกแถวใบเบิกเดิม (`FOR UPDATE`) · ยอดคืนรวมห้ามเกินที่เบิก, S/N ต้องอยู่ในใบเบิกนั้นและยังไม่คืน · ใบเบิกที่มีรับคืนห้ามยกเลิก (409 `HAS_RETURNS`) · ยกเลิกรับคืนแล้ว S/N กลับเป็น ISSUED · Dashboard ใช้ยอดสุทธิ (`NET_QTY`)
 - **เบิก (OUT):** ต้องมีหน่วยงานที่เบิกและหน่วยงานที่ใช้ (ทั้งสองช่องเลือกได้ทั้ง MAIN และ SUB ตั้งแต่ 2026-10-25) · USER เป็นผู้เบิกเอง ส่วน ADMIN/STAFF เลือกผู้ใช้หรือพิมพ์ชื่อ (`requesterName` เก็บเสมอ)
 - **Import:** นำเข้าครั้งแรกได้เฉพาะตอนระบบยังไม่มีวัสดุ · ของซื้อใหม่นำเข้าผ่านหน้ารับเข้า (ADMIN) ซึ่งใช้ `applyTransaction` ตัวเดียวกับหน้าเว็บ
 
