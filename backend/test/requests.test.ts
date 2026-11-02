@@ -181,3 +181,39 @@ describe('withdrawal requests: approve, reject', () => {
     expect(late.body.error.code).toBe('REQUEST_NOT_PENDING');
   });
 });
+
+describe('pending quantity and withdrawal document', () => {
+  it('pendingQuantity counts only pending requests', async () => {
+    const user = await loginAs('user');
+    await user.post(REQ).send(request(fx.paper.id, 5));
+    const rejected = (await user.post(REQ).send(request(fx.paper.id, 2))).body.data;
+    await (await loginAs('staff')).post(`${REQ}/${rejected.id}/reject`).send({ reason: 'x' });
+    expect((await user.get(`/api/v1/materials/${fx.paper.id}`)).body.data.pendingQuantity).toBe(5);
+    const list = (await user.get('/api/v1/materials?search=OFF')).body.data;
+    expect(list.map((m: { code: string; pendingQuantity: number }) => [m.code, m.pendingQuantity])).toEqual([
+      ['OFF-001', 5],
+      ['OFF-002', 0],
+    ]);
+  });
+
+  it('returns both signatures for an approved withdrawal, null for others, 404 for another USER', async () => {
+    const user = await loginAs('user');
+    const req = (await user.post(REQ).send(request(fx.paper.id, 2))).body.data;
+    const approved = (await (await loginAs('staff')).post(`${REQ}/${req.id}/approve`).send(approval(fx.paper.id, 2))).body.data;
+    const doc = await user.get(`/api/v1/inventory/transactions/${approved.transaction.id}/document`);
+    expect(doc.status).toBe(200);
+    expect(doc.body.data.transaction.referenceNo).toBe(approved.transaction.referenceNo);
+    expect(doc.body.data.request).toMatchObject({
+      requestNo: req.requestNo,
+      requesterName: 'ผู้ใช้ user',
+      requesterSignature: SIG,
+      approverSignature: SIG,
+      decidedBy: { fullName: 'ผู้ใช้ staff' },
+    });
+    expect((await (await loginAs('user2')).get(`/api/v1/inventory/transactions/${approved.transaction.id}/document`)).status).toBe(404);
+
+    const admin = await loginAs('admin');
+    const receipt = (await admin.post('/api/v1/inventory/transactions').send({ type: 'IN', items: [{ materialId: fx.paper.id, quantity: 1 }] })).body.data;
+    expect((await admin.get(`/api/v1/inventory/transactions/${receipt.id}/document`)).body.data.request).toBeNull();
+  });
+});

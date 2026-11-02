@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma.js';
 import type { SessionUser } from '../middlewares/auth.middleware.js';
 import { AppError, type FieldError, notFound } from '../utils/app-error.js';
 import { skipTake } from '../utils/http.js';
-import { applyTransaction, nextReferenceNo, toLine, withdrawalHeader } from './transaction.service.js';
+import { applyTransaction, getTransaction, nextReferenceNo, toLine, withdrawalHeader } from './transaction.service.js';
 
 // D17: every withdrawal is a signed request. STAFF/ADMIN other than its creator and requester
 // approve it (signing too), and only then does stock move, through applyTransaction.
@@ -87,6 +87,24 @@ export async function createRequest(user: SessionUser, input: CreateRequestInput
       select: requestSelect,
     }),
   );
+}
+
+/** Data for the printable withdrawal form. request is null for receipts, reversals and old withdrawals. */
+export async function withdrawalDocument(user: SessionUser, transactionId: string) {
+  const transaction = await getTransaction(user, transactionId);
+  const request = await prisma.withdrawalRequest.findUnique({
+    where: { transactionId },
+    select: {
+      requestNo: true,
+      createdAt: true,
+      requesterName: true,
+      requesterSignature: true,
+      decidedBy: person,
+      decidedAt: true,
+      approverSignature: true,
+    },
+  });
+  return { transaction, request };
 }
 
 export async function getRequest(user: SessionUser, id: string) {

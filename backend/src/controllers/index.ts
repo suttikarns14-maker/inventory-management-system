@@ -94,6 +94,9 @@ export const inventory = {
   async get(req: Request, res: Response) {
     ok(res, await transactions.getTransaction(currentUser(req), id(req)));
   },
+  async document(req: Request, res: Response) {
+    ok(res, await withdrawals.withdrawalDocument(currentUser(req), id(req)));
+  },
   async reverse(req: Request, res: Response) {
     const { note } = dto.reverseTransactionSchema.parse(req.body);
     ok(res, await transactions.reverseTransaction(currentUser(req), id(req), note), 201);

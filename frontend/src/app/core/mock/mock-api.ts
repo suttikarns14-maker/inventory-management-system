@@ -345,6 +345,7 @@ export class MockApi {
       ...m,
       category: { id: category.id, name: category.name },
       storageLocation: loc ? { id: loc.id, name: loc.name } : null,
+      pendingQuantity: 0, // mock is frozen (no requests)
     };
   }
 

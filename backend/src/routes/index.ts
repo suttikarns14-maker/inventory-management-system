@@ -46,6 +46,7 @@ export function apiRouter(): Router {
   // IN vs OUT permission depends on the body, so the service checks it.
   r.post('/inventory/transactions', inventory.create);
   r.get('/inventory/transactions/:id', inventory.get);
+  r.get('/inventory/transactions/:id/document', inventory.document);
   r.post('/inventory/transactions/:id/reverse', admin, inventory.reverse);
   r.patch('/inventory/transactions/:id/departments', admin, inventory.fillDepartments);
   r.get('/inventory/history', inventory.history);
