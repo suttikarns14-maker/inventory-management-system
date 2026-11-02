@@ -163,7 +163,7 @@
           @if (m.brand) {
             <span class="muted">{{ m.brand }}</span>
           }
-          <span class="muted">(คงเหลือ {{ m.currentQuantity }} {{ m.unit }})</span>
+          <span class="muted">(คงเหลือ {{ m.currentQuantity }} {{ m.unit }}@if (m.pendingQuantity) { · รออนุมัติ {{ m.pendingQuantity }} })</span>
         </mat-option>
       } @empty {
         <mat-option disabled>ไม่พบวัสดุ</mat-option>
@@ -180,6 +180,9 @@
             <div>
               <strong>{{ m.name }}</strong>
               <span class="muted"> {{ m.code }} · คงเหลือ {{ m.currentQuantity }} {{ m.unit }}</span>
+              @if (type() === 'OUT' && m.pendingQuantity) {
+                <span class="muted"> · รออนุมัติ {{ m.pendingQuantity }} {{ m.unit }}</span>
+              }
               @if (m.trackingType === 'SERIAL') {
                 <span class="badge badge-neutral">รายชิ้น (S/N)</span>
               }
@@ -189,7 +192,7 @@
             </button>
           </div>
 
-          @if (m.trackingType === 'QUANTITY') {
+          @if (!serialIn(line)) {
             <div class="line-fields">
               <mat-form-field class="qty">
                 <mat-label>จำนวน{{ typeLabel() }}</mat-label>
@@ -221,7 +224,7 @@
                 </mat-form-field>
               }
             </div>
-          } @else if (type() === 'IN') {
+          } @else {
             <div class="line-fields">
               <mat-form-field class="serials">
                 <mat-label>S/N ({{ serialCount(line) }} ชิ้น)</mat-label>
@@ -249,64 +252,6 @@
                 <input matInput type="number" min="0" step="0.01" formControlName="unitPrice" placeholder="ไม่บังคับ" />
               </mat-form-field>
             </div>
-          } @else {
-            <div class="line-fields">
-              <mat-form-field class="unit-search">
-                <mat-label>เลือก S/N ที่เบิก ({{ line.controls.units.length }} ชิ้น)</mat-label>
-                <mat-icon matPrefix>qr_code_scanner</mat-icon>
-                <input
-                  matInput
-                  formControlName="unitSearch"
-                  [id]="'line-' + m.id"
-                  [matAutocomplete]="unitAuto"
-                  (focus)="searchUnits(line)"
-                  (input)="searchUnits(line)"
-                  placeholder="พิมพ์หรือยิงบาร์โค้ด S/N"
-                />
-                <mat-autocomplete
-                  #unitAuto="matAutocomplete"
-                  [displayWith]="displayUnit"
-                  (optionSelected)="pickUnit(line, $event.option.value)"
-                >
-                  @for (u of unitOptions(); track u.id) {
-                    <mat-option [value]="u">
-                      <span [class.temp-sn]="u.isTempSerial">{{ u.serialNumber }}</span>
-                      <span class="muted"> {{ u.storageLocation?.name ?? '' }}</span>
-                    </mat-option>
-                  } @empty {
-                    <mat-option disabled>ไม่พบ S/N ที่อยู่ในคลัง</mat-option>
-                  }
-                </mat-autocomplete>
-                @if (line.controls.units.touched && line.controls.units.invalid) {
-                  <mat-hint class="text-danger">กรุณาเลือก S/N อย่างน้อย 1 ชิ้น</mat-hint>
-                }
-              </mat-form-field>
-              <div class="auto-add">
-                <mat-form-field class="count">
-                  <mat-label>จำนวน</mat-label>
-                  <input matInput type="number" min="1" formControlName="autoCount" />
-                </mat-form-field>
-                <button mat-stroked-button type="button" (click)="addFirstUnits(line)">ไม่ระบุ S/N: ใช้ S/N ชั่วคราว</button>
-              </div>
-            </div>
-            @if (line.controls.units.length) {
-              <div formArrayName="units" class="chosen">
-                @for (u of line.controls.units.controls; track u; let j = $index) {
-                  <div class="chosen-row" [formGroupName]="j">
-                    <span class="sn" [class.temp-sn]="u.controls.unit.value.isTempSerial">
-                      {{ u.controls.unit.value.serialNumber }}
-                    </span>
-                    <mat-form-field class="remark">
-                      <mat-label>หมายเหตุ เช่น ติดตั้งกับเครื่อง</mat-label>
-                      <input matInput formControlName="remark" />
-                    </mat-form-field>
-                    <button mat-icon-button type="button" (click)="removeUnit(line, j)" aria-label="เอาออก">
-                      <mat-icon>close</mat-icon>
-                    </button>
-                  </div>
-                }
-              </div>
-            }
           }
         </div>
       }
@@ -320,10 +265,25 @@
     <textarea matInput rows="2" formControlName="note"></textarea>
   </mat-form-field>
 
+  @if (type() === 'OUT') {
+    <section class="signature">
+      <h3>ลายเซ็นผู้เบิก</h3>
+      @if (isStaff) {
+        <p class="muted">ให้ผู้เบิกเซ็นบนจอนี้ คำขอจะรอผู้อนุมัติคนอื่นที่ไม่ใช่ผู้ส่งคำขอ</p>
+      } @else {
+        <p class="muted">คำขอจะรอเจ้าหน้าที่อนุมัติก่อน จึงจะรับของได้</p>
+      }
+      <app-signature-pad formControlName="signature" label="ลายเซ็นผู้เบิก" />
+      @if (form.controls.signature.touched && form.controls.signature.invalid) {
+        <p class="text-danger">{{ form.controls.signature.getError('server') ?? 'กรุณาเซ็นชื่อก่อนส่งคำขอ' }}</p>
+      }
+    </section>
+  }
+
   <div class="actions">
     <span class="muted count">{{ items.length }} รายการ</span>
     <button mat-flat-button type="submit" [disabled]="saving() || items.length === 0 || form.invalid">
-      {{ saving() ? 'กำลังบันทึก...' : 'ยืนยันรายการ' + typeLabel() }}
+      {{ saving() ? 'กำลังบันทึก...' : type() === 'OUT' ? 'ส่งคำขอเบิก' : 'ยืนยันรายการรับเข้า' }}
     </button>
   </div>
 </form>
