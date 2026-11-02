@@ -199,3 +199,20 @@ describe('dashboard (spec §6)', () => {
     expect((await (await loginAs('user')).get('/api/v1/dashboard/export')).status).toBe(403);
   });
 });
+
+describe('dashboard after returns (D18)', () => {
+  it('counts net usage: withdrawn minus live returns', async () => {
+    const staff = await loginAs('staff');
+    await staff.post('/api/v1/inventory/transactions').send({ type: 'IN', items: [{ materialId: fx.paper.id, quantity: 1, unitPrice: 100 }] });
+    const original = (await withdraw('user', out(fx.paper.id, 5))).body.data;
+    const ret = await staff.post(`/api/v1/inventory/transactions/${original.id}/return`).send({ note: 'ไม่ใช้', items: [{ materialId: fx.paper.id, quantity: 2 }] });
+    expect(ret.status).toBe(201);
+
+    const top = (await staff.get('/api/v1/dashboard/top-withdrawn')).body.data;
+    expect(top[0]).toMatchObject({ code: 'OFF-001', totalQuantity: 3, withdrawalCount: 1 });
+    const dept = (await staff.get('/api/v1/dashboard/by-department')).body.data;
+    expect(dept[0]).toMatchObject({ id: depts.usingDepartmentId, quantity: 3, value: 300 });
+    // A return carries no price, so the latest purchase price stays 100.
+    expect((await staff.get('/api/v1/dashboard/summary')).body.data.stockValue).toBe(1800);
+  });
+});
