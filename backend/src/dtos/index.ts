@@ -186,8 +186,10 @@ export const approveRequestSchema = z.object({
   signature,
   items: z
     .array(
-      transactionItem.pick({ materialId: true, units: true }).extend({
+      transactionItem.pick({ materialId: true }).extend({
         quantity: z.number({ error: 'จำนวนต้องเป็นตัวเลข' }).int('จำนวนต้องเป็นจำนวนเต็ม').min(0, 'จำนวนต้องไม่ติดลบ'),
+        // May be empty when the line is lowered to 0; the service checks it matches quantity.
+        units: z.array(z.object({ unitId: z.string().min(1), remark: optionalText('หมายเหตุ', 200) })).max(1000).optional(),
       }),
     )
     .min(1, 'ต้องมีรายการวัสดุอย่างน้อย 1 รายการ')

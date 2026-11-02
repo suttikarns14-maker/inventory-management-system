@@ -182,7 +182,7 @@ export class RequestApprovePage implements OnInit {
       items: v.items.map((l) => ({
         materialId: l.item.materialId,
         quantity: l.quantity,
-        ...(l.item.material.trackingType === 'SERIAL' && {
+        ...(l.item.material.trackingType === 'SERIAL' && l.quantity > 0 && {
           units: l.units.map((u) => ({ unitId: u.unit.id, remark: u.remark.trim() || null })),
         }),
       })),

@@ -170,6 +170,22 @@ describe('withdrawal requests: approve, reject', () => {
     expect((await prisma.materialUnit.findUniqueOrThrow({ where: { id: a!.id } })).status).toBe('ISSUED');
   });
 
+  it('lets a SERIAL line be lowered to 0 in a mixed request', async () => {
+    const ram = await prisma.material.create({
+      data: { code: 'HW-001', name: 'RAM', unit: 'ชิ้น', categoryId: fx.category.id, trackingType: 'SERIAL' },
+    });
+    const staff = await loginAs('staff');
+    await staff.post('/api/v1/inventory/transactions').send({ type: 'IN', items: [{ materialId: ram.id, serialNumbers: ['A'] }] });
+    const req = (await (await loginAs('user')).post(REQ).send({ ...depts, signature: SIG, items: [{ materialId: ram.id, quantity: 1 }, { materialId: fx.paper.id, quantity: 2 }] })).body.data;
+    // What the approve page sends for a SERIAL line set to 0: an empty units list.
+    const res = await staff.post(`${REQ}/${req.id}/approve`).send({
+      signature: SIG,
+      items: [{ materialId: ram.id, quantity: 0, units: [] }, { materialId: fx.paper.id, quantity: 2 }],
+    });
+    expect(res.status).toBe(200);
+    expect([await stockOf(ram.id), await stockOf(fx.paper.id)]).toEqual([1, 18]);
+  });
+
   it('needs a reason to reject, and a rejected request cannot be approved', async () => {
     const req = await pending(1);
     const staff = await loginAs('staff');
