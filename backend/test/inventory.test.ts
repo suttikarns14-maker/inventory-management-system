@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/lib/prisma.js';
-import { depts, loginAs, out, seedBasics, stockOf } from './helpers.js';
+import { depts, loginAs, out, seedBasics, SIG, stockOf, withdraw } from './helpers.js';
 
 let fx: Awaited<ReturnType<typeof seedBasics>>;
 beforeEach(async () => {
@@ -10,13 +10,13 @@ beforeEach(async () => {
 
 describe('stock transactions (spec §5)', () => {
   it('withdraws, returns the API contract shape and a daily reference number', async () => {
-    const agent = await loginAs('user');
-    const res = await agent.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 4));
+    const res = await withdraw('user', out(fx.paper.id, 4));
     expect(res.status).toBe(201);
     expect(res.body.data).toMatchObject({
       type: 'OUT',
       referenceNo: expect.stringMatching(/^TXN-\d{8}-001$/),
-      createdBy: { fullName: 'ผู้ใช้ user' },
+      createdBy: { fullName: 'ผู้ใช้ admin' }, // the approver records the movement (D17)
+      requester: { fullName: 'ผู้ใช้ user' },
       reversalOf: null,
       reversedBy: null,
       items: [{ quantity: 4, unitPrice: null, material: { code: 'OFF-001', unit: 'รีม' } }],
@@ -34,27 +34,24 @@ describe('stock transactions (spec §5)', () => {
   });
 
   it('is all-or-nothing: one short line rolls back every line', async () => {
-    const agent = await loginAs('staff');
-    const res = await agent.post('/api/v1/inventory/transactions').send({
-      type: 'OUT',
-      ...depts,
-      items: [
-        { materialId: fx.paper.id, quantity: 1 },
-        { materialId: fx.pens.id, quantity: 4 },
-      ],
-    });
+    const items = [
+      { materialId: fx.paper.id, quantity: 1 },
+      { materialId: fx.pens.id, quantity: 3 },
+    ];
+    const both = (await (await loginAs('user')).post('/api/v1/inventory/requests').send({ ...depts, signature: SIG, items })).body.data;
+    expect((await withdraw('user2', out(fx.pens.id, 1))).status).toBe(201); // pens 3 -> 2
+    const res = await (await loginAs('staff')).post(`/api/v1/inventory/requests/${both.id}/approve`).send({ signature: SIG, items });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('INSUFFICIENT_STOCK');
-    expect(res.body.error.message).toContain('คงเหลือ 3 ด้าม');
-    expect([await stockOf(fx.paper.id), await stockOf(fx.pens.id)]).toEqual([20, 3]);
-    expect(await prisma.stockTransaction.count()).toBe(0);
+    expect(res.body.error.message).toContain('คงเหลือ 2 ด้าม');
+    expect([await stockOf(fx.paper.id), await stockOf(fx.pens.id)]).toEqual([20, 2]);
+    expect(await prisma.stockTransaction.count()).toBe(1);
   });
 
   it('never oversells under concurrent withdrawals', async () => {
-    const agents = await Promise.all([loginAs('user'), loginAs('user2'), loginAs('staff')]);
     // 12 simultaneous requests for 1 pen each, but only 3 pens in stock.
     const results = await Promise.all(
-      Array.from({ length: 12 }, (_, i) => agents[i % 3]!.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 1))),
+      Array.from({ length: 12 }, (_, i) => withdraw(['user', 'user2', 'staff'][i % 3]!, out(fx.pens.id, 1))),
     );
     const statuses = results.map((r) => r.status).sort();
     expect(statuses.filter((s) => s === 201)).toHaveLength(3);
@@ -77,13 +74,12 @@ describe('stock transactions (spec §5)', () => {
   });
 
   it('validates quantities and duplicate lines', async () => {
-    const agent = await loginAs('staff');
-    const negative = await agent.post('/api/v1/inventory/transactions').send(out(fx.paper.id, -5));
+    const negative = await withdraw('staff', out(fx.paper.id, -5));
     expect(negative.body.error.code).toBe('VALIDATION_ERROR');
     expect(negative.body.error.details[0].field).toBe('items.0.quantity');
-    const fraction = await agent.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 1.5));
+    const fraction = await withdraw('staff', out(fx.paper.id, 1.5));
     expect(fraction.body.error.code).toBe('VALIDATION_ERROR');
-    const dup = await agent.post('/api/v1/inventory/transactions').send({
+    const dup = await (await loginAs('staff')).post('/api/v1/inventory/transactions').send({
       type: 'IN',
       items: [
         { materialId: fx.paper.id, quantity: 1 },
@@ -104,7 +100,7 @@ describe('reversal (spec §5.3)', () => {
   it('restores stock, links both records, and can only happen once', async () => {
     const user = await loginAs('user');
     const admin = await loginAs('admin');
-    const txn = (await user.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 5))).body.data;
+    const txn = (await withdraw('user', out(fx.paper.id, 5))).body.data;
     const rev = await admin.post(`/api/v1/inventory/transactions/${txn.id}/reverse`).send({ note: 'บันทึกผิด' });
     expect(rev.status).toBe(201);
     expect(rev.body.data).toMatchObject({ type: 'IN', reversalOf: { id: txn.id } });
@@ -118,7 +114,7 @@ describe('reversal (spec §5.3)', () => {
 
   it('lets only one of two simultaneous reversals win', async () => {
     const admin = await loginAs('admin');
-    const txn = (await admin.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 2))).body.data;
+    const txn = (await withdraw('admin', out(fx.paper.id, 2))).body.data;
     const results = await Promise.all([
       admin.post(`/api/v1/inventory/transactions/${txn.id}/reverse`).send({ note: 'a' }),
       admin.post(`/api/v1/inventory/transactions/${txn.id}/reverse`).send({ note: 'b' }),
@@ -132,7 +128,7 @@ describe('reversal (spec §5.3)', () => {
     const receipt = (
       await admin.post('/api/v1/inventory/transactions').send({ type: 'IN', items: [{ materialId: fx.pens.id, quantity: 5 }] })
     ).body.data;
-    await admin.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 7));
+    await withdraw('admin', out(fx.pens.id, 7));
     const res = await admin.post(`/api/v1/inventory/transactions/${receipt.id}/reverse`).send({ note: 'x' });
     expect(res.body.error.code).toBe('INSUFFICIENT_STOCK');
   });
@@ -142,18 +138,18 @@ describe('history', () => {
   it('shows USER only their own transactions, and hides others by id', async () => {
     const staff = await loginAs('staff');
     const user = await loginAs('user');
-    const theirs = (await staff.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 1))).body.data;
-    await user.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 1));
+    const theirs = (await withdraw('staff', out(fx.paper.id, 1))).body.data;
+    await withdraw('user', out(fx.paper.id, 1));
     const mine = await user.get('/api/v1/inventory/history?createdById=' + theirs.createdBy.id);
     expect(mine.body.data).toHaveLength(1);
-    expect(mine.body.data[0].createdBy.fullName).toBe('ผู้ใช้ user');
+    expect(mine.body.data[0].requester.fullName).toBe('ผู้ใช้ user');
     expect((await user.get(`/api/v1/inventory/transactions/${theirs.id}`)).status).toBe(404);
     expect((await staff.get('/api/v1/inventory/history')).body.meta.total).toBe(2);
   });
 
   it('filters by Bangkok calendar day', async () => {
     const staff = await loginAs('staff');
-    await staff.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 1));
+    await withdraw('staff', out(fx.paper.id, 1));
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
     expect((await staff.get(`/api/v1/inventory/history?from=${today}&to=${today}`)).body.data).toHaveLength(1);
     expect((await staff.get('/api/v1/inventory/history?to=2000-01-01')).body.data).toHaveLength(0);
@@ -162,7 +158,7 @@ describe('history', () => {
   it('lets ADMIN fill in only an empty department of an imported withdrawal (D14)', async () => {
     const admin = await loginAs('admin');
     const staff = await loginAs('staff');
-    const txn = (await staff.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 2))).body.data;
+    const txn = (await withdraw('staff', out(fx.paper.id, 2))).body.data;
     // Like imported history whose old "using department" name could not be matched.
     await prisma.stockTransaction.update({ where: { id: txn.id }, data: { usingDepartmentId: null } });
     const missing = () => admin.get('/api/v1/inventory/history?missingDepartment=true');
@@ -184,5 +180,14 @@ describe('history', () => {
 
     const receipt = (await admin.post('/api/v1/inventory/transactions').send({ type: 'IN', items: [{ materialId: fx.paper.id, quantity: 1 }] })).body.data;
     expect((await admin.patch(`/api/v1/inventory/transactions/${receipt.id}/departments`).send({ usingDepartmentId: fx.sub.id })).status).toBe(400);
+  });
+});
+
+describe('request body', () => {
+  it('rejects an oversized body with 400, not 500', async () => {
+    const admin = await loginAs('admin');
+    const res = await admin.post('/api/v1/inventory/transactions').send({ type: 'OUT', note: 'x'.repeat(600_000), items: [] });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 });

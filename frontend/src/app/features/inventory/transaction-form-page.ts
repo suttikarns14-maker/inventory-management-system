@@ -18,9 +18,10 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { BehaviorSubject, catchError, debounceTime, filter, forkJoin, map, of, startWith, switchMap } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
+import { SignaturePad } from '../../shared/components/signature-pad';
 import { Department, LookupItem } from '../../shared/models/lookup';
 import { Material } from '../../shared/models/material';
 import {
@@ -29,7 +30,6 @@ import {
   TransactionItemInput,
   TransactionType,
 } from '../../shared/models/transaction';
-import { MaterialUnit } from '../../shared/models/unit';
 import { UserOption } from '../../shared/models/user';
 import { active, LookupService } from '../../shared/services/lookup.service';
 import { Notify } from '../../shared/services/notify';
@@ -37,21 +37,15 @@ import { apiError, applyServerErrors } from '../../shared/utils/api-error';
 import { MaterialService } from '../materials/material.service';
 import { InventoryService } from './inventory.service';
 import { ReceiptImportDialog } from './receipt-import-dialog';
-import { UnitService } from './unit.service';
-
-type UnitLine = FormGroup<{ unit: FormControl<MaterialUnit>; remark: FormControl<string> }>;
+import { RequestService } from './request.service';
 
 type Line = FormGroup<{
   material: FormControl<Material>;
-  /** QUANTITY materials */
+  /** QUANTITY materials, and every OUT line (the approver picks the serials, D17) */
   quantity: FormControl<number | null>;
   unitPrice: FormControl<number | null>;
   /** SERIAL + IN: one serial per line (named like the API field so server errors land here) */
   serialNumbers: FormControl<string>;
-  /** SERIAL + OUT: chosen units */
-  units: FormArray<UnitLine>;
-  unitSearch: FormControl<string | MaterialUnit>;
-  autoCount: FormControl<number | null>;
 }>;
 
 /** Show field errors as soon as the user types, not only after blur (spec: warn immediately). */
@@ -93,6 +87,7 @@ const picked = (c: AbstractControl): ValidationErrors | null =>
     MatSelectModule,
     MatButtonModule,
     MatIconModule,
+    SignaturePad,
   ],
   templateUrl: './transaction-form-page.html',
   styleUrl: './transaction-form-page.scss',
@@ -101,7 +96,8 @@ const picked = (c: AbstractControl): ValidationErrors | null =>
 export class TransactionFormPage {
   private inventory = inject(InventoryService);
   private materials = inject(MaterialService);
-  private unitService = inject(UnitService);
+  private requests = inject(RequestService);
+  private router = inject(Router);
   private notify = inject(Notify);
   private dialog = inject(MatDialog);
   private auth = inject(AuthService);
@@ -136,6 +132,8 @@ export class TransactionFormPage {
     buildingId: new FormControl('', { nonNullable: true }),
     floor: new FormControl('', { nonNullable: true }),
     purpose: new FormControl('', { nonNullable: true, validators: Validators.maxLength(200) }),
+    /** OUT: the requester signs (D17) */
+    signature: new FormControl('', { nonNullable: true }),
     items: new FormArray<Line>([]),
   });
   protected readonly items = this.form.controls.items;
@@ -182,25 +180,6 @@ export class TransactionFormPage {
   );
   protected readonly blank = () => '';
 
-  // ---- serial picker (SERIAL + OUT); one shared list for whichever line is being edited ----
-  private readonly unitQuery$ = new BehaviorSubject<{ line: Line; text: string } | null>(null);
-  protected readonly unitOptions = toSignal(
-    this.unitQuery$.pipe(
-      filter((q): q is { line: Line; text: string } => q !== null),
-      debounceTime(250),
-      switchMap(({ line, text }) => {
-        const taken = new Set(line.controls.units.controls.map((u) => u.controls.unit.value.id));
-        return this.unitService
-          .forMaterial(line.controls.material.value.id, { status: 'IN_STOCK', search: text || undefined, limit: 30 })
-          .pipe(
-            map((p) => p.items.filter((u) => !taken.has(u.id))),
-            catchError(() => of<MaterialUnit[]>([])),
-          );
-      }),
-    ),
-    { initialValue: [] },
-  );
-
   constructor() {
     this.picker.valueChanges
       .pipe(
@@ -221,19 +200,22 @@ export class TransactionFormPage {
     c.requester.setValidators(out && this.isStaff ? [Validators.required] : []);
     c.requestingDepartmentId.setValidators(out ? [picked] : []);
     c.usingDepartmentId.setValidators(out ? [picked] : []);
-    for (const ctrl of [c.requester, c.requestingDepartmentId, c.usingDepartmentId]) ctrl.updateValueAndValidity();
+    c.signature.setValidators(out ? [Validators.required] : []);
+    for (const ctrl of [c.requester, c.requestingDepartmentId, c.usingDepartmentId, c.signature]) ctrl.updateValueAndValidity();
     this.items.controls.forEach((line) => this.applyLineRules(line));
   }
 
-  /** Which inputs a line needs: QUANTITY → quantity; SERIAL + IN → serials; SERIAL + OUT → units. */
+  /** Which inputs a line needs: SERIAL + IN → serials; everything else → quantity. */
   private applyLineRules(line: Line): void {
-    const serial = line.controls.material.value.trackingType === 'SERIAL';
-    const out = this.form.controls.type.value === 'OUT';
-    const { quantity, serialNumbers, units } = line.controls;
-    quantity.setValidators(serial ? [] : [Validators.required, positiveInteger, this.withinStock]);
-    serialNumbers.setValidators(serial && !out ? [this.serialList] : []);
-    units.setValidators(serial && out ? [(a) => ((a as FormArray).length ? null : { required: true })] : []);
-    for (const ctrl of [quantity, serialNumbers, units]) ctrl.updateValueAndValidity();
+    const serialIn = line.controls.material.value.trackingType === 'SERIAL' && this.form.controls.type.value === 'IN';
+    const { quantity, serialNumbers } = line.controls;
+    quantity.setValidators(serialIn ? [] : [Validators.required, positiveInteger, this.withinStock]);
+    serialNumbers.setValidators(serialIn ? [this.serialList] : []);
+    for (const ctrl of [quantity, serialNumbers]) ctrl.updateValueAndValidity();
+  }
+
+  protected serialIn(line: Line): boolean {
+    return line.controls.material.value.trackingType === 'SERIAL' && this.type() === 'IN';
   }
 
   /** OUT only: quantity must not exceed the stock known for that line. */
@@ -269,9 +251,6 @@ export class TransactionFormPage {
         quantity: new FormControl<number | null>(null),
         unitPrice: new FormControl<number | null>(null, Validators.min(0)),
         serialNumbers: new FormControl('', { nonNullable: true }),
-        units: new FormArray<UnitLine>([]),
-        unitSearch: new FormControl<string | MaterialUnit>('', { nonNullable: true }),
-        autoCount: new FormControl<number | null>(null),
       });
       this.items.push(line);
       this.applyLineRules(line);
@@ -283,47 +262,6 @@ export class TransactionFormPage {
   protected remove(index: number): void {
     this.items.removeAt(index);
   }
-
-  protected searchUnits(line: Line): void {
-    const v = line.controls.unitSearch.value;
-    this.unitQuery$.next({ line, text: typeof v === 'string' ? v.trim() : '' });
-  }
-
-  protected pickUnit(line: Line, unit: MaterialUnit): void {
-    line.controls.unitSearch.setValue('');
-    if (line.controls.units.controls.some((u) => u.controls.unit.value.id === unit.id)) return;
-    line.controls.units.push(
-      new FormGroup({
-        unit: new FormControl(unit, { nonNullable: true }),
-        remark: new FormControl('', { nonNullable: true, validators: Validators.maxLength(200) }),
-      }),
-    );
-    this.searchUnits(line);
-  }
-
-  /** No serial given: adds N placeholder (-TEMP-SN-) units still in stock, so real serials stay for when they are known. */
-  protected addFirstUnits(line: Line): void {
-    const want = line.controls.autoCount.value ?? 0;
-    if (want < 1) return;
-    const taken = new Set(line.controls.units.controls.map((u) => u.controls.unit.value.id));
-    this.unitService
-      .forMaterial(line.controls.material.value.id, { status: 'IN_STOCK', tempOnly: true, limit: Math.min(want + taken.size, 100) })
-      .subscribe({
-        next: (p) => {
-          const free = p.items.filter((u) => !taken.has(u.id)).slice(0, want);
-          free.forEach((u) => this.pickUnit(line, u));
-          if (free.length < want) this.notify.error(`S/N ชั่วคราวเหลือให้เลือกได้อีก ${free.length} ชิ้น ที่เหลือกรุณาเลือก S/N`);
-          line.controls.autoCount.setValue(null);
-        },
-        error: (err: unknown) => this.notify.error(err),
-      });
-  }
-
-  protected removeUnit(line: Line, index: number): void {
-    line.controls.units.removeAt(index);
-  }
-
-  protected readonly displayUnit = () => '';
 
   protected openImport(): void {
     this.dialog
@@ -342,45 +280,63 @@ export class TransactionFormPage {
       return;
     }
     const v = this.form.getRawValue();
-    const out = v.type === 'OUT';
-    const id = (x: string | { id: string }) => (typeof x === 'object' ? x.id : null);
+    const note = v.note.trim() || undefined;
+    this.saving.set(true);
+    const error = (err: unknown) => {
+      this.saving.set(false);
+      const code = apiError(err)?.code;
+      if (code === 'INSUFFICIENT_STOCK' || code === 'UNIT_NOT_AVAILABLE') this.refreshStock();
+      if (!applyServerErrors(this.form, err)) this.notify.error(err);
+    };
+
+    if (v.type === 'OUT') {
+      // D17: a withdrawal is a signed request; stock moves when STAFF/ADMIN approve it.
+      const id = (x: string | { id: string }) => (typeof x === 'object' ? x.id : null);
+      this.requests
+        .create({
+          note,
+          ...(this.isStaff &&
+            (typeof v.requester === 'object' ? { requesterId: v.requester.id } : { requesterName: v.requester.trim() })),
+          requestingDepartmentId: id(v.requestingDepartmentId),
+          usingDepartmentId: id(v.usingDepartmentId),
+          buildingId: v.buildingId || null,
+          floor: v.floor || null,
+          purpose: v.purpose.trim() || null,
+          signature: v.signature,
+          items: v.items.map((l) => ({ materialId: l.material.id, quantity: l.quantity! })),
+        })
+        .subscribe({
+          next: (req) => {
+            this.saving.set(false);
+            this.notify.success(`ส่งคำขอเบิกแล้ว (${req.requestNo}) รออนุมัติ`);
+            this.router.navigate(['/inventory/requests']);
+          },
+          error,
+        });
+      return;
+    }
+
     const input: CreateTransactionInput = {
-      type: v.type,
-      note: v.note.trim() || undefined,
-      ...(out
-        ? {
-            ...(this.isStaff &&
-              (typeof v.requester === 'object' ? { requesterId: v.requester.id } : { requesterName: v.requester.trim() })),
-            requestingDepartmentId: id(v.requestingDepartmentId),
-            usingDepartmentId: id(v.usingDepartmentId),
-            buildingId: v.buildingId || null,
-            floor: v.floor || null,
-            purpose: v.purpose.trim() || null,
-          }
-        : { fiscalYear: v.fiscalYear, projectName: v.projectName.trim() || null }),
+      type: 'IN',
+      note,
+      fiscalYear: v.fiscalYear,
+      projectName: v.projectName.trim() || null,
       items: v.items.map((l): TransactionItemInput => {
-        const price = !out && l.unitPrice !== null ? { unitPrice: l.unitPrice } : {};
-        if (l.material.trackingType === 'QUANTITY') return { materialId: l.material.id, quantity: l.quantity!, ...price };
-        return out
-          ? { materialId: l.material.id, units: l.units.map((u) => ({ unitId: u.unit.id, remark: u.remark.trim() || null })) }
+        const price = l.unitPrice !== null ? { unitPrice: l.unitPrice } : {};
+        return l.material.trackingType === 'QUANTITY'
+          ? { materialId: l.material.id, quantity: l.quantity!, ...price }
           : { materialId: l.material.id, serialNumbers: parseSerials(l.serialNumbers), ...price };
       }),
     };
-    this.saving.set(true);
     this.inventory.create(input).subscribe({
       next: (txn) => {
         this.saving.set(false);
-        this.notify.success(`บันทึก${this.typeLabel()}สำเร็จ (${txn.referenceNo})`);
+        this.notify.success(`บันทึกรับเข้าสำเร็จ (${txn.referenceNo})`);
         this.items.clear();
         this.form.controls.note.reset();
         this.search$.next(this.search$.value); // refresh stock shown in the search list
       },
-      error: (err: unknown) => {
-        this.saving.set(false);
-        const code = apiError(err)?.code;
-        if (code === 'INSUFFICIENT_STOCK' || code === 'UNIT_NOT_AVAILABLE') this.refreshStock();
-        if (!applyServerErrors(this.form, err)) this.notify.error(err);
-      },
+      error,
     });
   }
 

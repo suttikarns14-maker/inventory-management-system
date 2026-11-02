@@ -10,6 +10,7 @@ import * as dashboard from '../services/dashboard.service.js';
 import * as importer from '../services/import.service.js';
 import * as lookups from '../services/lookup.service.js';
 import * as units from '../services/unit.service.js';
+import * as withdrawals from '../services/request.service.js';
 import * as materials from '../services/material.service.js';
 import * as transactions from '../services/transaction.service.js';
 import * as users from '../services/user.service.js';
@@ -93,9 +94,19 @@ export const inventory = {
   async get(req: Request, res: Response) {
     ok(res, await transactions.getTransaction(currentUser(req), id(req)));
   },
+  async document(req: Request, res: Response) {
+    ok(res, await withdrawals.withdrawalDocument(currentUser(req), id(req)));
+  },
   async reverse(req: Request, res: Response) {
     const { note } = dto.reverseTransactionSchema.parse(req.body);
     ok(res, await transactions.reverseTransaction(currentUser(req), id(req), note), 201);
+  },
+  async returnable(req: Request, res: Response) {
+    ok(res, await transactions.returnable(id(req)));
+  },
+  async returnItems(req: Request, res: Response) {
+    const input = dto.returnSchema.parse(req.body);
+    ok(res, await transactions.returnTransaction(currentUser(req), id(req), input), 201);
   },
   async fillDepartments(req: Request, res: Response) {
     const input = dto.fillDepartmentsSchema.parse(req.body);
@@ -104,6 +115,30 @@ export const inventory = {
   async history(req: Request, res: Response) {
     const q = dto.historySchema.parse(req.query);
     sendPage(res, await transactions.history(currentUser(req), q), q);
+  },
+};
+
+/** Withdrawal requests (D17). */
+export const requests = {
+  async create(req: Request, res: Response) {
+    ok(res, await withdrawals.createRequest(currentUser(req), dto.createRequestSchema.parse(req.body)), 201);
+  },
+  async list(req: Request, res: Response) {
+    const q = dto.listRequestsSchema.parse(req.query);
+    sendPage(res, await withdrawals.listRequests(currentUser(req), q), q);
+  },
+  async get(req: Request, res: Response) {
+    ok(res, await withdrawals.getRequest(currentUser(req), id(req)));
+  },
+  async cancel(req: Request, res: Response) {
+    ok(res, await withdrawals.cancelRequest(currentUser(req), id(req)));
+  },
+  async approve(req: Request, res: Response) {
+    ok(res, await withdrawals.approveRequest(currentUser(req), id(req), dto.approveRequestSchema.parse(req.body)));
+  },
+  async reject(req: Request, res: Response) {
+    const { reason } = dto.rejectRequestSchema.parse(req.body);
+    ok(res, await withdrawals.rejectRequest(currentUser(req), id(req), reason));
   },
 };
 

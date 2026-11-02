@@ -35,6 +35,8 @@ export interface Material {
   storageLocation: { id: string; name: string } | null;
   unit: string;
   currentQuantity: number;
+  /** Pieces in withdrawal requests still waiting for approval (D17). */
+  pendingQuantity: number;
   minStock: number;
   createdAt: string;
   updatedAt: string;

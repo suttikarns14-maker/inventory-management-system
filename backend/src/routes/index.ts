@@ -7,6 +7,7 @@ import {
   inventory,
   lookup,
   material,
+  requests,
   unit,
   user,
 } from '../controllers/index.js';
@@ -45,9 +46,20 @@ export function apiRouter(): Router {
   // IN vs OUT permission depends on the body, so the service checks it.
   r.post('/inventory/transactions', inventory.create);
   r.get('/inventory/transactions/:id', inventory.get);
+  r.get('/inventory/transactions/:id/document', inventory.document);
+  r.get('/inventory/transactions/:id/return', staff, inventory.returnable);
+  r.post('/inventory/transactions/:id/return', staff, inventory.returnItems);
   r.post('/inventory/transactions/:id/reverse', admin, inventory.reverse);
   r.patch('/inventory/transactions/:id/departments', admin, inventory.fillDepartments);
   r.get('/inventory/history', inventory.history);
+
+  // Withdrawal requests (D17): anyone asks and signs; STAFF/ADMIN other than the requester decide.
+  r.post('/inventory/requests', requests.create);
+  r.get('/inventory/requests', requests.list);
+  r.get('/inventory/requests/:id', requests.get);
+  r.post('/inventory/requests/:id/cancel', requests.cancel);
+  r.post('/inventory/requests/:id/approve', staff, requests.approve);
+  r.post('/inventory/requests/:id/reject', staff, requests.reject);
 
   // Serial numbers and reference lists (spec v2.2 §3)
   r.get('/units', staff, unit.search);

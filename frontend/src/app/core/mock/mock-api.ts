@@ -345,6 +345,7 @@ export class MockApi {
       ...m,
       category: { id: category.id, name: category.name },
       storageLocation: loc ? { id: loc.id, name: loc.name } : null,
+      pendingQuantity: 0, // mock is frozen (no requests)
     };
   }
 
@@ -436,6 +437,8 @@ export class MockApi {
       note: t.note,
       reversalOf: ref(this.db.transactions.find((x) => x.id === t.reversalOfId)),
       reversedBy: ref(this.db.transactions.find((x) => x.reversalOfId === t.id)),
+      returnOf: null, // mock frozen: no returns (D18)
+      returns: [],
       createdAt: t.createdAt,
       fiscalYear: t.fiscalYear,
       projectName: t.projectName,

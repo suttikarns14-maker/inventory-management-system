@@ -18,6 +18,14 @@ export const routes: Routes = [
     loadComponent: () => import('./features/errors/forbidden-page').then((m) => m.ForbiddenPage),
   },
   {
+    // Printable withdrawal form, outside the shell so only the sheet prints (D17).
+    path: 'inventory/transactions/:id/document',
+    title: 'ใบเบิกวัสดุ',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/inventory/withdrawal-document-page').then((m) => m.WithdrawalDocumentPage),
+  },
+  {
     path: '',
     component: Shell,
     canActivate: [authGuard],
@@ -67,6 +75,19 @@ export const routes: Routes = [
         title: 'รับเข้า / เบิกจ่าย',
         loadComponent: () =>
           import('./features/inventory/transaction-form-page').then((m) => m.TransactionFormPage),
+      },
+      {
+        path: 'inventory/requests',
+        title: 'คำขอเบิก',
+        loadComponent: () =>
+          import('./features/inventory/request-list-page').then((m) => m.RequestListPage),
+      },
+      {
+        path: 'inventory/requests/:id/approve',
+        title: 'อนุมัติคำขอเบิก',
+        data: { roles: ['ADMIN', 'STAFF'] },
+        loadComponent: () =>
+          import('./features/inventory/request-approve-page').then((m) => m.RequestApprovePage),
       },
       {
         path: 'inventory/history',

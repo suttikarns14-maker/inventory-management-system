@@ -68,45 +68,6 @@
   }
 }
 
-.unit-search {
-  flex: 1 1 320px;
-}
-
-.auto-add {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-
-  .count {
-    width: 100px;
-  }
-}
-
-.chosen {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  // room for the floating label of the first field inside the scroll area
-  padding-top: 8px;
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-.chosen-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  .sn {
-    min-width: 180px;
-    font-family: ui-monospace, monospace;
-    word-break: break-all;
-  }
-
-  .remark {
-    flex: 1;
-  }
-}
 
 .note {
   margin-top: 8px;
@@ -115,4 +76,12 @@
 .count {
   margin-right: auto;
   align-self: center;
+}
+
+.signature {
+  margin: 8px 0 16px;
+
+  h3 {
+    margin: 0 0 4px;
+  }
 }

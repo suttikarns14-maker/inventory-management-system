@@ -11,7 +11,7 @@ export function createApp() {
   app.set('trust proxy', 'loopback');
   app.use(helmet());
   // JSON only: together with SameSite=Lax cookies this blocks cross-site form posts (CSRF).
-  app.use(express.json({ limit: '100kb' }));
+  app.use(express.json({ limit: '512kb' })); // two signature images fit (D17)
   app.use(cookieParser());
 
   app.get('/api/health', (_req, res) => {

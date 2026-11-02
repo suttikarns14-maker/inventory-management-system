@@ -3,6 +3,8 @@ import type { z } from 'zod';
 import type {
   CreateTransactionInput,
   FillDepartmentsInput,
+  ReturnInput,
+  WithdrawalHeaderInput,
   historySchema,
   TransactionItemInput,
 } from '../dtos/index.js';
@@ -35,6 +37,13 @@ export const transactionSelect = {
   building: ref,
   reversalOf: { select: { id: true, referenceNo: true } },
   reversedBy: { select: { id: true, referenceNo: true } },
+  returnOf: { select: { id: true, referenceNo: true } },
+  // Live returns only (D18); a reversed return no longer counts.
+  returns: {
+    where: { reversedBy: { is: null } },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, referenceNo: true, items: { select: { materialId: true, quantity: true } } },
+  },
   items: {
     select: {
       id: true,
@@ -71,13 +80,15 @@ export function toTransactionDto({ units, ...t }: TransactionRow) {
 // ---- reference numbers ----
 
 /** TXN-YYYYMMDD-NNN from a per-day counter (spec §5.2). The row lock serialises same-day numbering. */
-export async function nextReferenceNo(tx: Tx, date = bangkokDate()): Promise<string> {
+export async function nextReferenceNo(tx: Tx, date = bangkokDate(), prefix: 'TXN' | 'REQ' = 'TXN'): Promise<string> {
   const day = date.replaceAll('-', '');
+  // TXN keeps its original key (YYYYMMDD); requests count separately (D17).
+  const key = prefix === 'TXN' ? day : `${prefix}-${day}`;
   const [row] = await tx.$queryRaw<{ last_value: number }[]>`
-    INSERT INTO reference_counters (date, last_value) VALUES (${day}, 1)
+    INSERT INTO reference_counters (date, last_value) VALUES (${key}, 1)
     ON CONFLICT (date) DO UPDATE SET last_value = reference_counters.last_value + 1
     RETURNING last_value`;
-  return `TXN-${day}-${String(row!.last_value).padStart(3, '0')}`;
+  return `${prefix}-${day}-${String(row!.last_value).padStart(3, '0')}`;
 }
 
 // ---- core movement ----
@@ -128,6 +139,11 @@ export async function applyTransaction(
       const m = byId.get(item.materialId);
       if (!m) throw notFound('ไม่พบวัสดุบางรายการ');
     }
+    // Reversing a receipt voids its units; reversing a return (D18) hands them back out (ISSUED).
+    const voidUnits =
+      type === 'OUT' &&
+      !!reversalOfId &&
+      !(await tx.stockTransaction.findUniqueOrThrow({ where: { id: reversalOfId }, select: { returnOfId: true } })).returnOfId;
 
     const newUnits: {
       id: string;
@@ -162,7 +178,7 @@ export async function applyTransaction(
         // IN (reversing a withdrawal): ISSUED -> IN_STOCK. OUT: IN_STOCK -> ISSUED, or for a
         // reversed receipt IN_STOCK -> VOID. Conditional, so two people cannot take the same unit.
         const from = type === 'IN' ? 'ISSUED' : 'IN_STOCK';
-        const to = type === 'IN' ? 'IN_STOCK' : reversalOfId ? 'VOID' : 'ISSUED';
+        const to = type === 'IN' ? 'IN_STOCK' : voidUnits ? 'VOID' : 'ISSUED';
         const { count } = await tx.materialUnit.updateMany({
           where: { id: { in: ids }, materialId: m.id, status: from },
           data: { status: to },
@@ -262,7 +278,9 @@ export async function assertSerialsFree(tx: Tx, serials: string[]): Promise<void
 // ---- create ----
 
 export async function createTransaction(user: SessionUser, input: CreateTransactionInput) {
-  if (input.type === 'IN' && user.role === 'USER') {
+  // D17: withdrawals go through a signed request and an approval (request.service.ts).
+  if (input.type === 'OUT') throw fieldError('type', 'การเบิกต้องส่งเป็นคำขอเบิกและรออนุมัติ');
+  if (user.role === 'USER') {
     throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์บันทึกรับเข้า');
   }
   const trackingTypes = new Map(
@@ -274,12 +292,11 @@ export async function createTransaction(user: SessionUser, input: CreateTransact
     ).map((m) => [m.id, m.trackingType]),
   );
   const lines = input.items.map((item, i) => toLine(input.type, item, trackingTypes.get(item.materialId), i));
-  const header = input.type === 'IN' ? receiptHeader(user, input) : await withdrawalHeader(user, input);
-  return applyTransaction(user, input.type, header, lines);
+  return applyTransaction(user, input.type, receiptHeader(user, input), lines);
 }
 
 /** Checks the item has the fields its material's tracking type needs (spec v2.2 §3). */
-function toLine(type: TransactionType, item: TransactionItemInput, tracking: TrackingType | undefined, i: number): Line {
+export function toLine(type: TransactionType, item: TransactionItemInput, tracking: TrackingType | undefined, i: number): Line {
   const field = (name: string) => `items.${i}.${name}`;
   if (!tracking) throw notFound('ไม่พบวัสดุบางรายการ');
   if (tracking === 'QUANTITY') {
@@ -316,7 +333,7 @@ function receiptHeader(user: SessionUser, input: CreateTransactionInput): Header
 }
 
 /** Spec v2.2 D10/D11/Q2. */
-async function withdrawalHeader(user: SessionUser, input: CreateTransactionInput): Promise<Header> {
+export async function withdrawalHeader(user: SessionUser, input: WithdrawalHeaderInput): Promise<Header> {
   const errors: FieldError[] = [];
 
   // Requester: USER is always themselves; ADMIN/STAFF pick a user or type a name.
@@ -364,38 +381,133 @@ async function withdrawalHeader(user: SessionUser, input: CreateTransactionInput
 
 // ---- reversal ----
 
+/** Row lock on a transaction: serialises returns and reversals of the same withdrawal (D18). */
+const lockTransaction = (tx: Tx, id: string) => tx.$queryRaw`SELECT id FROM stock_transactions WHERE id = ${id} FOR UPDATE`;
+
 /** Spec §5.3: never edit history; post the opposite movement instead. ADMIN only (route guard). */
 export async function reverseTransaction(admin: SessionUser, id: string, note: string) {
-  const original = await prisma.stockTransaction.findUnique({
-    where: { id },
-    include: { items: true, units: { include: { unit: { select: { materialId: true } } } }, reversedBy: { select: { id: true } } },
-  });
-  if (!original) throw notFound('ไม่พบรายการ');
   const alreadyReversed = () =>
     new AppError(409, 'ALREADY_REVERSED', 'รายการนี้ถูกยกเลิกไปแล้ว หรือเป็นรายการยกเลิก');
-  if (original.reversedBy || original.reversalOfId) throw alreadyReversed();
-
-  const lines: Line[] = original.items.map(({ materialId, quantity }) => {
-    const units = original.units.filter((u) => u.unit.materialId === materialId);
-    return {
-      materialId,
-      quantity,
-      ...(units.length && { units: units.map((u) => ({ unitId: u.unitId, remark: u.remark })) }),
-    };
-  });
   try {
-    return await applyTransaction(
-      admin,
-      original.type === 'IN' ? 'OUT' : 'IN',
-      { note: `ยกเลิก ${original.referenceNo}: ${note}`, requesterName: admin.fullName },
-      lines,
-      original.id,
-    );
+    return await prisma.$transaction(async (tx) => {
+      await lockTransaction(tx, id);
+      const original = await tx.stockTransaction.findUnique({
+        where: { id },
+        include: {
+          items: true,
+          units: { include: { unit: { select: { materialId: true } } } },
+          reversedBy: { select: { id: true } },
+          _count: { select: { returns: { where: { reversedBy: { is: null } } } } },
+        },
+      });
+      if (!original) throw notFound('ไม่พบรายการ');
+      if (original.reversedBy || original.reversalOfId) throw alreadyReversed();
+      if (original._count.returns) {
+        throw new AppError(409, 'HAS_RETURNS', 'รายการนี้มีการรับคืนแล้ว ต้องยกเลิกรายการรับคืนก่อน');
+      }
+
+      const lines: Line[] = original.items.map(({ materialId, quantity }) => {
+        const units = original.units.filter((u) => u.unit.materialId === materialId);
+        return {
+          materialId,
+          quantity,
+          ...(units.length && { units: units.map((u) => ({ unitId: u.unitId, remark: u.remark })) }),
+        };
+      });
+      return applyTransaction(
+        admin,
+        original.type === 'IN' ? 'OUT' : 'IN',
+        { note: `ยกเลิก ${original.referenceNo}: ${note}`, requesterName: admin.fullName },
+        lines,
+        original.id,
+        tx,
+      );
+    });
   } catch (e) {
-    // Two admins reversing at the same moment: the unique reversal_of_id lets only one win.
+    // Backstop: the unique reversal_of_id lets only one reversal win.
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw alreadyReversed();
     throw e;
   }
+}
+
+// ---- returns (D18) ----
+
+const notReturnable = () => new AppError(400, 'VALIDATION_ERROR', 'รับคืนได้เฉพาะรายการเบิกที่ยังไม่ถูกยกเลิก');
+
+/** A withdrawal with, per line, how much is already back and which serial units can still come back. */
+export async function returnable(id: string, db: Tx | typeof prisma = prisma) {
+  const row = await db.stockTransaction.findUnique({ where: { id }, select: transactionSelect });
+  if (!row) throw notFound('ไม่พบรายการ');
+  if (row.type !== 'OUT' || row.reversalOf || row.reversedBy) throw notReturnable();
+  const back = await db.transactionUnit.findMany({
+    where: { transaction: { returnOfId: id, reversedBy: { is: null } } },
+    select: { unitId: true },
+  });
+  const returnedUnits = new Set(back.map((u) => u.unitId));
+  const transaction = toTransactionDto(row);
+  const lines = transaction.items.map(({ materialId, quantity, material, units }) => ({
+    materialId,
+    code: material.code,
+    name: material.name,
+    unit: material.unit,
+    trackingType: material.trackingType,
+    issued: quantity,
+    returned: row.returns.flatMap((r) => r.items).filter((i) => i.materialId === materialId).reduce((n, i) => n + i.quantity, 0),
+    units: units.filter((u) => !returnedUnits.has(u.id)).map(({ id, serialNumber }) => ({ id, serialNumber })),
+  }));
+  return { transaction, lines };
+}
+
+/** STAFF/ADMIN take back good items from a withdrawal: an IN linked to it, never more than was issued. */
+export async function returnTransaction(user: SessionUser, id: string, input: ReturnInput) {
+  return prisma.$transaction(async (tx) => {
+    await lockTransaction(tx, id);
+    const { transaction: t, lines } = await returnable(id, tx);
+
+    const errors: FieldError[] = [];
+    const moves: Line[] = [];
+    for (const [i, item] of input.items.entries()) {
+      const line = lines.find((l) => l.materialId === item.materialId);
+      if (!line) {
+        errors.push({ field: `items.${i}.materialId`, message: 'วัสดุนี้ไม่อยู่ในใบเบิก' });
+        continue;
+      }
+      const left = line.issued - line.returned;
+      if (item.quantity > left) {
+        errors.push({ field: `items.${i}.quantity`, message: `คืนได้ไม่เกิน ${left} ${line.unit}` });
+        continue;
+      }
+      if (line.trackingType === 'QUANTITY') {
+        moves.push({ materialId: item.materialId, quantity: item.quantity });
+        continue;
+      }
+      if (item.units?.length !== item.quantity) {
+        errors.push({ field: `items.${i}.units`, message: 'กรุณาเลือก S/N ให้ครบตามจำนวน' });
+        continue;
+      }
+      if (!item.units.every((u) => line.units.some((l) => l.id === u.unitId))) {
+        throw new AppError(400, 'UNIT_NOT_AVAILABLE', `วัสดุ "${line.name}" มีบาง S/N ที่ไม่อยู่ในใบเบิกนี้หรือคืนไปแล้ว`);
+      }
+      moves.push({ materialId: item.materialId, quantity: item.quantity, units: item.units.map((u) => ({ unitId: u.unitId, remark: null })) });
+    }
+    if (errors.length) throw new AppError(400, 'VALIDATION_ERROR', 'ข้อมูลไม่ถูกต้อง', errors);
+
+    return applyTransaction(
+      user,
+      'IN',
+      {
+        note: `คืนจาก ${t.referenceNo}: ${input.note}`,
+        returnOfId: id,
+        requesterId: t.requester?.id ?? null,
+        requesterName: t.requesterName,
+        requestingDepartmentId: t.requestingDepartment?.id ?? null,
+        usingDepartmentId: t.usingDepartment?.id ?? null,
+      },
+      moves,
+      null,
+      tx,
+    );
+  });
 }
 
 // ---- fill in missing departments ----

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/lib/prisma.js';
-import { depts, loginAs, seedBasics, stockOf } from './helpers.js';
+import { depts, loginAs, seedBasics, SIG, stockOf, withdraw } from './helpers.js';
 
 let fx: Awaited<ReturnType<typeof seedBasics>>;
 let ramId: string;
@@ -63,7 +63,7 @@ describe('serial-tracked materials (spec v2.2 §2.3)', () => {
     const staff = await loginAs('staff');
     await staff.post('/api/v1/inventory/transactions').send(receive(['SN-A', 'SN-B']));
     const [a] = await unitsOf();
-    const res = await staff.post('/api/v1/inventory/transactions').send(issue([a!.id], { purpose: 'Notebook นศพ', floor: '3' }));
+    const res = await withdraw('staff', issue([a!.id], { purpose: 'Notebook นศพ', floor: '3' }));
     expect(res.status).toBe(201);
     expect(res.body.data).toMatchObject({
       requestingDepartment: { name: 'ฝ่ายเทคโนโลยีสารสนเทศ' },
@@ -73,7 +73,7 @@ describe('serial-tracked materials (spec v2.2 §2.3)', () => {
     });
     expect(res.body.data.items[0].units).toEqual([{ id: a!.id, serialNumber: 'SN-A', isTempSerial: false, remark: 'VJRNB0300' }]);
     expect(await stockOf(ramId)).toBe(1);
-    const again = await staff.post('/api/v1/inventory/transactions').send(issue([a!.id]));
+    const again = await withdraw('staff', issue([a!.id]));
     expect(again.body.error.code).toBe('UNIT_NOT_AVAILABLE');
     expect(await stockOf(ramId)).toBe(1);
   });
@@ -83,8 +83,8 @@ describe('serial-tracked materials (spec v2.2 §2.3)', () => {
     await staff.post('/api/v1/inventory/transactions').send(receive(['SN-A', 'SN-B']));
     const [a] = await unitsOf();
     const results = await Promise.all([
-      staff.post('/api/v1/inventory/transactions').send(issue([a!.id])),
-      staff.post('/api/v1/inventory/transactions').send(issue([a!.id])),
+      withdraw('staff', issue([a!.id])),
+      withdraw('staff', issue([a!.id])),
     ]);
     expect(results.map((r) => r.status).sort()).toEqual([201, 400]);
     expect(await stockOf(ramId)).toBe(1);
@@ -96,7 +96,7 @@ describe('serial-tracked materials (spec v2.2 §2.3)', () => {
     const admin = await loginAs('admin');
     const receipt = (await staff.post('/api/v1/inventory/transactions').send(receive(['SN-A', 'SN-B']))).body.data;
     const [a] = await unitsOf();
-    const withdrawal = (await staff.post('/api/v1/inventory/transactions').send(issue([a!.id]))).body.data;
+    const withdrawal = (await withdraw('staff', issue([a!.id]))).body.data;
 
     // Receipt cannot be reversed while one of its units is out.
     const blocked = await admin.post(`/api/v1/inventory/transactions/${receipt.id}/reverse`).send({ note: 'ผิด' });
@@ -123,17 +123,19 @@ describe('serial-tracked materials (spec v2.2 §2.3)', () => {
   });
 });
 
+const REQ = '/api/v1/inventory/requests';
+
 describe('withdrawal details (spec v2.2 D10, D11, Q2)', () => {
   it('requires both departments; either may be a main or a sub department', async () => {
     const staff = await loginAs('staff');
-    const base = { type: 'OUT', requesterName: 'x', items: [{ materialId: fx.paper.id, quantity: 1 }] };
-    const none = await staff.post('/api/v1/inventory/transactions').send(base);
+    const base = { requesterName: 'x', signature: SIG, items: [{ materialId: fx.paper.id, quantity: 1 }] };
+    const none = await staff.post(REQ).send(base);
     expect(none.body.error.details.map((d: { field: string }) => d.field).sort()).toEqual([
       'requestingDepartmentId',
       'usingDepartmentId',
     ]);
     const subAsRequesting = await staff
-      .post('/api/v1/inventory/transactions')
+      .post(REQ)
       .send({ ...base, requestingDepartmentId: fx.sub.id, usingDepartmentId: fx.main.id });
     expect(subAsRequesting.status).toBe(201);
   });
@@ -141,22 +143,22 @@ describe('withdrawal details (spec v2.2 D10, D11, Q2)', () => {
   it('USER is always the requester; STAFF may pick a user, who then sees it in their history', async () => {
     const user = await loginAs('user');
     const own = await user
-      .post('/api/v1/inventory/transactions')
-      .send({ ...depts, type: 'OUT', requesterName: 'คนอื่น', items: [{ materialId: fx.paper.id, quantity: 1 }] });
+      .post(REQ)
+      .send({ ...depts, signature: SIG, requesterName: 'คนอื่น', items: [{ materialId: fx.paper.id, quantity: 1 }] });
     expect(own.body.data.requesterName).toBe('ผู้ใช้ user');
 
     const staff = await loginAs('staff');
     const options = (await staff.get('/api/v1/users/options')).body.data;
     const target = options.find((u: { username: string }) => u.username === 'user');
     const onBehalf = await staff
-      .post('/api/v1/inventory/transactions')
-      .send({ ...depts, type: 'OUT', requesterName: undefined, requesterId: target.id, items: [{ materialId: fx.paper.id, quantity: 1 }] });
+      .post(REQ)
+      .send({ ...depts, signature: SIG, requesterName: undefined, requesterId: target.id, items: [{ materialId: fx.paper.id, quantity: 1 }] });
     expect(onBehalf.body.data).toMatchObject({ requesterName: 'ผู้ใช้ user', requester: { id: target.id } });
-    expect((await user.get('/api/v1/inventory/history')).body.meta.total).toBe(2);
+    expect((await user.get(REQ)).body.meta.total).toBe(2);
 
     const nobody = await staff
-      .post('/api/v1/inventory/transactions')
-      .send({ ...depts, requesterName: undefined, type: 'OUT', items: [{ materialId: fx.paper.id, quantity: 1 }] });
+      .post(REQ)
+      .send({ ...depts, signature: SIG, requesterName: undefined, items: [{ materialId: fx.paper.id, quantity: 1 }] });
     expect(nobody.body.error.details[0].field).toBe('requesterName');
   });
 });
@@ -168,7 +170,7 @@ describe('serial search and fixes (spec v2.2 §3)', () => {
     await staff.post('/api/v1/inventory/transactions').send(receive(['SN-A', 'SN-A-TEMP-SN-01']));
     await prisma.materialUnit.updateMany({ where: { serialNumber: 'SN-A-TEMP-SN-01' }, data: { isTempSerial: true } });
     const [a] = await unitsOf();
-    await staff.post('/api/v1/inventory/transactions').send(issue([a!.id]));
+    await withdraw('staff', issue([a!.id]));
 
     const found = (await staff.get('/api/v1/units?search=sn-a')).body.data;
     expect(found).toHaveLength(2);

@@ -19,6 +19,14 @@ const REAL_WITHDRAWAL = Prisma.sql`
   AND t.reversal_of_id IS NULL
   AND NOT EXISTS (SELECT 1 FROM stock_transactions r WHERE r.reversal_of_id = t.id)`;
 
+/** Quantity of line `i` of withdrawal `t` still out: minus live returns of that material (D18). */
+const NET_QTY = Prisma.sql`(i.quantity - COALESCE((
+  SELECT SUM(ri.quantity)
+  FROM stock_transaction_items ri
+  JOIN stock_transactions rt ON rt.id = ri.transaction_id
+  WHERE rt.return_of_id = t.id AND ri.material_id = i.material_id
+    AND NOT EXISTS (SELECT 1 FROM stock_transactions rr WHERE rr.reversal_of_id = rt.id)), 0))`;
+
 /**
  * Latest purchase price of material `m` (decision: latest price, not a weighted average):
  * the unit price of the newest non-reversed IN line that has one. Use in a LEFT JOIN LATERAL.
@@ -27,7 +35,7 @@ const LATEST_PRICE = Prisma.sql`
   SELECT i.unit_price::float8 AS price
   FROM stock_transaction_items i
   JOIN stock_transactions t ON t.id = i.transaction_id
-  WHERE i.material_id = m.id AND t.type = 'IN' AND i.unit_price IS NOT NULL
+  WHERE i.material_id = m.id AND t.type = 'IN' AND i.unit_price IS NOT NULL AND t.return_of_id IS NULL
     AND t.reversal_of_id IS NULL
     AND NOT EXISTS (SELECT 1 FROM stock_transactions r WHERE r.reversal_of_id = t.id)
   ORDER BY t.created_at DESC
@@ -90,7 +98,7 @@ export async function reorderSuggestions() {
            COALESCE(u.used, 0)::int AS used
     FROM materials m
     LEFT JOIN (
-      SELECT i.material_id, SUM(i.quantity) AS used
+      SELECT i.material_id, SUM(${NET_QTY}) AS used
       FROM stock_transaction_items i
       JOIN stock_transactions t ON t.id = i.transaction_id
       WHERE ${REAL_WITHDRAWAL} AND t.created_at >= ${daysAgo(USAGE_WINDOW_DAYS)}
@@ -125,7 +133,7 @@ export function topWithdrawn(q: z.infer<typeof topWithdrawnSchema>) {
     { id: string; code: string; name: string; brand: string | null; model: string | null; unit: string; totalQuantity: number; withdrawalCount: number }[]
   >`
     SELECT m.id, m.code, m.name, m.brand, m.model, m.unit,
-           SUM(i.quantity)::int AS "totalQuantity",
+           SUM(${NET_QTY})::int AS "totalQuantity",
            COUNT(DISTINCT t.id)::int AS "withdrawalCount"
     FROM stock_transaction_items i
     JOIN stock_transactions t ON t.id = i.transaction_id
@@ -184,7 +192,7 @@ export function procurement() {
     JOIN transaction_units tu ON tu.transaction_id = t.id
     JOIN material_units u ON u.id = tu.unit_id
     JOIN stock_transaction_items i ON i.transaction_id = t.id AND i.material_id = u.material_id
-    WHERE t.type = 'IN' AND t.reversal_of_id IS NULL
+    WHERE t.type = 'IN' AND t.reversal_of_id IS NULL AND t.return_of_id IS NULL -- a return (D18) is not a purchase
       AND NOT EXISTS (SELECT 1 FROM stock_transactions r WHERE r.reversal_of_id = t.id)
     GROUP BY 1, 2
     ORDER BY 1 DESC, 2 NULLS FIRST`;
@@ -201,8 +209,8 @@ export function byDepartment(days: number | undefined) {
   >`
     SELECT d.id, d.name,
            COUNT(DISTINCT t.id)::int AS "withdrawalCount",
-           SUM(i.quantity)::int AS quantity,
-           COALESCE(SUM(i.quantity * p.price), 0)::float8 AS value
+           SUM(${NET_QTY})::int AS quantity,
+           COALESCE(SUM(${NET_QTY} * p.price), 0)::float8 AS value
     FROM stock_transaction_items i
     JOIN stock_transactions t ON t.id = i.transaction_id
     JOIN materials m ON m.id = i.material_id
@@ -268,7 +276,7 @@ export async function monthlyWithdrawals() {
   const [y, m] = bangkokDate().slice(0, 7).split('-').map(Number) as [number, number];
   const monthKey = (back: number) => new Date(Date.UTC(y, m - 1 - back, 1)).toISOString().slice(0, 7);
   const rows = await prisma.$queryRaw<{ month: string; quantity: number }[]>`
-    SELECT to_char(t.created_at AT TIME ZONE 'Asia/Bangkok', 'YYYY-MM') AS month, SUM(i.quantity)::int AS quantity
+    SELECT to_char(t.created_at AT TIME ZONE 'Asia/Bangkok', 'YYYY-MM') AS month, SUM(${NET_QTY})::int AS quantity
     FROM stock_transaction_items i
     JOIN stock_transactions t ON t.id = i.transaction_id
     WHERE ${REAL_WITHDRAWAL}

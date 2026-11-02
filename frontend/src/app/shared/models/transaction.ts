@@ -47,6 +47,10 @@ export interface StockTransaction {
   note: string | null;
   reversalOf: TransactionRef | null;
   reversedBy: TransactionRef | null;
+  /** D18: set on a return; the withdrawal it takes items back from. */
+  returnOf: TransactionRef | null;
+  /** D18: live (not reversed) returns of this withdrawal. */
+  returns: (TransactionRef & { items: { materialId: string; quantity: number }[] })[];
   createdAt: string;
   // IN
   fiscalYear: number | null;
@@ -102,4 +106,26 @@ export interface HistoryQuery {
   missingDepartment?: boolean;
   page?: number;
   limit?: number;
+}
+
+/** D18: one line of a withdrawal as seen by the return dialog. `units` = serials that can still come back. */
+export interface ReturnLine {
+  materialId: string;
+  code: string;
+  name: string;
+  unit: string;
+  trackingType: 'QUANTITY' | 'SERIAL';
+  issued: number;
+  returned: number;
+  units: { id: string; serialNumber: string }[];
+}
+
+export interface Returnable {
+  transaction: StockTransaction;
+  lines: ReturnLine[];
+}
+
+export interface ReturnInput {
+  note: string;
+  items: { materialId: string; quantity: number; units?: { unitId: string }[] }[];
 }

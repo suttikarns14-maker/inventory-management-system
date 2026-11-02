@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/lib/prisma.js';
-import { depts, loginAs, out, seedBasics } from './helpers.js';
+import { depts, loginAs, out, seedBasics, withdraw } from './helpers.js';
 
 let fx: Awaited<ReturnType<typeof seedBasics>>;
 beforeEach(async () => {
@@ -16,11 +16,11 @@ describe('dashboard (spec §6)', () => {
     const unusedMat = await prisma.material.create({
       data: { code: 'OFF-003', name: 'แฟ้ม', unit: 'เล่ม', minStock: 0, categoryId: fx.category.id, currentQuantity: 9 },
     });
-    await staff.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 2));
-    await staff.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 3));
-    await staff.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 1));
+    await withdraw('staff', out(fx.paper.id, 2));
+    await withdraw('staff', out(fx.paper.id, 3));
+    await withdraw('staff', out(fx.pens.id, 1));
     // A mistaken withdrawal of 2 pens, then reversed: it must not count as usage.
-    const mistake = (await staff.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 2))).body.data;
+    const mistake = (await withdraw('staff', out(fx.pens.id, 2))).body.data;
     await admin.post(`/api/v1/inventory/transactions/${mistake.id}/reverse`).send({ note: 'ผิด' });
 
     const byQty = (await staff.get('/api/v1/dashboard/top-withdrawn')).body.data;
@@ -85,7 +85,7 @@ describe('dashboard (spec §6)', () => {
 
   it('suggests reorders, out-of-stock first', async () => {
     const staff = await loginAs('staff');
-    await staff.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 3)); // pens -> 0
+    await withdraw('staff', out(fx.pens.id, 3)); // pens -> 0
     const list = (await staff.get('/api/v1/dashboard/reorder-suggestions')).body.data;
     expect(list[0]).toMatchObject({ code: 'OFF-002', currentQuantity: 0, minStock: 10, daysLeft: 0 });
     // minStock 10 + 3/90 per day * 30 days = 11 after rounding up
@@ -107,7 +107,7 @@ describe('dashboard (spec §6)', () => {
     await receive(['D1'], {}); // no fiscal year: falls in the current one (starts 1 Oct)
     await prisma.stockTransactionItem.updateMany({ where: { transactionId: tor.id }, data: { unitPrice: 100 } });
     const a1 = await prisma.materialUnit.findFirstOrThrow({ where: { serialNumber: 'A1' } });
-    await admin.post('/api/v1/inventory/transactions').send({ type: 'OUT', ...depts, requesterName: 'ก', items: [{ materialId: ram.id, units: [{ unitId: a1.id }] }] });
+    const issued = (await withdraw('admin', { type: 'OUT', ...depts, requesterName: 'ก', items: [{ materialId: ram.id, units: [{ unitId: a1.id }] }] })).body.data;
 
     const now = new Date(Date.now() + 7 * 3_600_000); // Bangkok
     const currentFy = now.getUTCFullYear() + 543 + (now.getUTCMonth() >= 9 ? 1 : 0);
@@ -117,15 +117,22 @@ describe('dashboard (spec §6)', () => {
       { fiscalYear: 2568, projectName: null, receivedQty: 2, receivedValue: 0, unpricedQty: 2, remainingQty: 2, remainingValue: 0 },
       { fiscalYear: 2567, projectName: 'TOR 1', receivedQty: 3, receivedValue: 300, unpricedQty: 0, remainingQty: 2, remainingValue: 200 },
     ]);
+
+    // D18: a return is not a purchase; A1 counts again under its original receipt only.
+    await admin.post(`/api/v1/inventory/transactions/${issued.id}/return`).send({ note: 'คืน', items: [{ materialId: ram.id, quantity: 1, units: [{ unitId: a1.id }] }] });
+    const after = (await admin.get('/api/v1/dashboard/procurement')).body.data;
+    expect(after[0]).toMatchObject({ projectName: null, receivedQty: 1, unpricedQty: 1, remainingQty: 1 });
+    expect(after).toHaveLength(3);
+    expect(after[2]).toMatchObject({ projectName: 'TOR 1', receivedQty: 3, remainingQty: 3, remainingValue: 300 });
   });
 
   it('compares monthly withdrawals with the same month last year', async () => {
     const staff = await loginAs('staff');
     const admin = await loginAs('admin');
-    await staff.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 2));
-    const old = (await staff.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 3))).body.data;
+    await withdraw('staff', out(fx.paper.id, 2));
+    const old = (await withdraw('staff', out(fx.paper.id, 3))).body.data;
     await prisma.stockTransaction.update({ where: { id: old.id }, data: { createdAt: new Date(Date.now() - 365 * 86_400_000) } });
-    const mistake = (await staff.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 1))).body.data;
+    const mistake = (await withdraw('staff', out(fx.pens.id, 1))).body.data;
     await admin.post(`/api/v1/inventory/transactions/${mistake.id}/reverse`).send({ note: 'ผิด' });
 
     const months = (await staff.get('/api/v1/dashboard/monthly-withdrawals')).body.data;
@@ -140,11 +147,11 @@ describe('dashboard (spec §6)', () => {
   it('totals withdrawals per using department within a period', async () => {
     const admin = await loginAs('admin');
     await admin.post('/api/v1/inventory/transactions').send({ type: 'IN', items: [{ materialId: fx.paper.id, quantity: 1, unitPrice: 10 }] });
-    await admin.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 2, { requesterName: 'ก' })); // -> sub
-    const old = (await admin.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 3, { requesterName: 'ก' }))).body.data;
+    await withdraw('admin', out(fx.paper.id, 2, { requesterName: 'ก' })); // -> sub
+    const old = (await withdraw('admin', out(fx.paper.id, 3, { requesterName: 'ก' }))).body.data;
     await prisma.stockTransaction.update({ where: { id: old.id }, data: { createdAt: new Date(Date.now() - 100 * 86_400_000) } });
-    await admin.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 1, { requesterName: 'ก', usingDepartmentId: fx.main.id }));
-    const mistake = (await admin.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 2, { requesterName: 'ก' }))).body.data;
+    await withdraw('admin', out(fx.pens.id, 1, { requesterName: 'ก', usingDepartmentId: fx.main.id }));
+    const mistake = (await withdraw('admin', out(fx.pens.id, 2, { requesterName: 'ก' }))).body.data;
     await admin.post(`/api/v1/inventory/transactions/${mistake.id}/reverse`).send({ note: 'ผิด' });
 
     const all = (await admin.get('/api/v1/dashboard/by-department')).body.data;
@@ -197,5 +204,22 @@ describe('dashboard (spec §6)', () => {
     ]);
     expect(wb.getWorksheet('ควรสั่งซื้อ')!.getCell('A2').value).toBe('OFF-002'); // pens are below min stock
     expect((await (await loginAs('user')).get('/api/v1/dashboard/export')).status).toBe(403);
+  });
+});
+
+describe('dashboard after returns (D18)', () => {
+  it('counts net usage: withdrawn minus live returns', async () => {
+    const staff = await loginAs('staff');
+    await staff.post('/api/v1/inventory/transactions').send({ type: 'IN', items: [{ materialId: fx.paper.id, quantity: 1, unitPrice: 100 }] });
+    const original = (await withdraw('user', out(fx.paper.id, 5))).body.data;
+    const ret = await staff.post(`/api/v1/inventory/transactions/${original.id}/return`).send({ note: 'ไม่ใช้', items: [{ materialId: fx.paper.id, quantity: 2 }] });
+    expect(ret.status).toBe(201);
+
+    const top = (await staff.get('/api/v1/dashboard/top-withdrawn')).body.data;
+    expect(top[0]).toMatchObject({ code: 'OFF-001', totalQuantity: 3, withdrawalCount: 1 });
+    const dept = (await staff.get('/api/v1/dashboard/by-department')).body.data;
+    expect(dept[0]).toMatchObject({ id: depts.usingDepartmentId, quantity: 3, value: 300 });
+    // A return carries no price, so the latest purchase price stays 100.
+    expect((await staff.get('/api/v1/dashboard/summary')).body.data.stockValue).toBe(1800);
   });
 });

@@ -27,6 +27,7 @@ function toAppError(err: unknown): AppError {
 
   // Malformed JSON body from express.json()
   if (isBodyParserError(err)) return new AppError(400, 'VALIDATION_ERROR', 'รูปแบบข้อมูลไม่ถูกต้อง');
+  if (isBodyTooLarge(err)) return new AppError(400, 'VALIDATION_ERROR', 'ข้อมูลมีขนาดใหญ่เกินไป');
 
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     // Services check uniqueness first for friendly messages; this catches the rare race.
@@ -35,6 +36,10 @@ function toAppError(err: unknown): AppError {
   }
 
   return new AppError(500, 'INTERNAL_ERROR', 'เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่');
+}
+
+function isBodyTooLarge(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { type?: string }).type === 'entity.too.large';
 }
 
 function isBodyParserError(err: unknown): boolean {

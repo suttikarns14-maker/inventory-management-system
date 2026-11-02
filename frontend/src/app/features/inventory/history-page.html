@@ -111,9 +111,7 @@
           <th>รายการวัสดุ</th>
           <th>ผู้เบิก / หน่วยงาน</th>
           <th>หมายเหตุ</th>
-          @if (canReverse) {
-            <th></th>
-          }
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -128,10 +126,16 @@
               @if (t.reversalOf) {
                 <div><span class="badge badge-warn">รายการยกเลิกของ {{ t.reversalOf.referenceNo }}</span></div>
               }
+              @if (t.returnOf) {
+                <div><span class="badge badge-neutral">รับคืนจาก {{ t.returnOf.referenceNo }}</span></div>
+              }
+              @for (r of t.returns; track r.id) {
+                <div><span class="badge badge-neutral">รับคืนแล้ว {{ r.referenceNo }}</span></div>
+              }
             </td>
             <td>
               <span class="badge" [class]="t.type === 'IN' ? 'badge badge-ok' : 'badge badge-danger'">
-                {{ typeLabels[t.type] }}
+                {{ t.returnOf ? 'รับคืน' : typeLabels[t.type] }}
               </span>
             </td>
             <td>
@@ -158,7 +162,7 @@
               </ul>
             </td>
             <td>
-              @if (t.type === 'OUT' && !t.reversalOf) {
+              @if ((t.type === 'OUT' && !t.reversalOf) || t.returnOf) {
                 {{ t.requesterName }}
                 <div class="muted">
                   {{ t.requestingDepartment?.name ?? '' }}
@@ -178,13 +182,29 @@
                   <div class="muted">ปีงบ {{ t.fiscalYear ?? '-' }} {{ t.projectName ? '· ' + t.projectName : '' }}</div>
                 }
               }
-              @if (t.createdBy.fullName !== t.requesterName && t.type === 'OUT') {
+              @if (t.createdBy.fullName !== t.requesterName && (t.type === 'OUT' || t.returnOf)) {
                 <div class="muted">บันทึกโดย {{ t.createdBy.fullName }}</div>
               }
             </td>
             <td class="note">{{ t.note ?? '-' }}</td>
-            @if (canReverse) {
-              <td class="nowrap">
+            <td class="nowrap">
+              @if (t.type === 'OUT' && !t.reversalOf) {
+                <a
+                  mat-icon-button
+                  [routerLink]="['/inventory/transactions', t.id, 'document']"
+                  target="_blank"
+                  matTooltip="ใบเบิก (พิมพ์ / PDF)"
+                  aria-label="ใบเบิก (พิมพ์ / PDF)"
+                >
+                  <mat-icon>print</mat-icon>
+                </a>
+                @if (canReturn && !t.reversedBy) {
+                  <button mat-icon-button (click)="takeBack(t)" matTooltip="รับคืน" aria-label="รับคืน">
+                    <mat-icon>assignment_return</mat-icon>
+                  </button>
+                }
+              }
+              @if (canReverse) {
                 @if (missingDepartment(t)) {
                   <button
                     mat-icon-button
@@ -205,12 +225,12 @@
                     <mat-icon>undo</mat-icon>
                   </button>
                 }
-              </td>
-            }
+              }
+            </td>
           </tr>
         } @empty {
           <tr>
-            <td class="empty" [attr.colspan]="canReverse ? 7 : 6">
+            <td class="empty" colspan="7">
               {{ loading() ? 'กำลังโหลด...' : 'ไม่พบรายการตามเงื่อนไขที่เลือก' }}
             </td>
           </tr>

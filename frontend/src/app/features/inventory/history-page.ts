@@ -12,7 +12,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ReasonDialog, ReasonDialogData } from '../../shared/components/reason-dialog';
@@ -27,6 +27,7 @@ import { Notify } from '../../shared/services/notify';
 import { MaterialService } from '../materials/material.service';
 import { FillDepartmentsData, FillDepartmentsDialog } from './fill-departments-dialog';
 import { InventoryService } from './inventory.service';
+import { ReturnDialog } from './return-dialog';
 
 @Component({
   selector: 'app-history-page',
@@ -42,6 +43,7 @@ import { InventoryService } from './inventory.service';
     MatProgressBarModule,
     MatTooltipModule,
     MatCheckboxModule,
+    RouterLink,
   ],
   templateUrl: './history-page.html',
   styleUrl: './history-page.scss',
@@ -55,6 +57,7 @@ export class HistoryPage {
 
   protected readonly isUser = this.auth.hasRole('USER');
   protected readonly canReverse = this.auth.hasRole('ADMIN');
+  protected readonly canReturn = this.auth.hasRole('ADMIN', 'STAFF');
   protected readonly typeLabels = TRANSACTION_TYPE_LABELS;
   protected readonly materials = toSignal(
     inject(MaterialService)
@@ -130,6 +133,17 @@ export class HistoryPage {
       .subscribe((updated) => {
         if (!updated) return;
         this.notify.success(`บันทึกหน่วยงานของ ${updated.referenceNo} แล้ว`);
+        this.load();
+      });
+  }
+
+  protected takeBack(txn: StockTransaction): void {
+    this.dialog
+      .open<ReturnDialog, StockTransaction, StockTransaction>(ReturnDialog, { data: txn, width: '560px' })
+      .afterClosed()
+      .subscribe((ret) => {
+        if (!ret) return;
+        this.notify.success(`บันทึกรับคืนแล้ว (${ret.referenceNo})`);
         this.load();
       });
   }

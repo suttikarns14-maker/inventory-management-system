@@ -20,6 +20,17 @@ export function materialKey(name: string, brand?: string | null, model?: string 
   return [norm(name), norm(brand), norm(model)].join('|');
 }
 
+/** Adds pendingQuantity: pieces asked for in requests still waiting for approval (D17). */
+async function withPending<T extends { id: string }>(materials: T[]): Promise<(T & { pendingQuantity: number })[]> {
+  const sums = await prisma.withdrawalRequestItem.groupBy({
+    by: ['materialId'],
+    where: { materialId: { in: materials.map((m) => m.id) }, request: { status: 'PENDING' } },
+    _sum: { quantity: true },
+  });
+  const pending = new Map(sums.map((s) => [s.materialId, s._sum.quantity ?? 0]));
+  return materials.map((m) => ({ ...m, pendingQuantity: pending.get(m.id) ?? 0 }));
+}
+
 export async function listMaterials(q: z.infer<typeof listMaterialsSchema>) {
   const where: Prisma.MaterialWhereInput = {
     ...(q.categoryId && { categoryId: q.categoryId }),
@@ -47,13 +58,13 @@ export async function listMaterials(q: z.infer<typeof listMaterialsSchema>) {
     }),
     prisma.material.count({ where }),
   ]);
-  return { items, total };
+  return { items: await withPending(items), total };
 }
 
 export async function getMaterial(id: string) {
   const material = await prisma.material.findUnique({ where: { id }, include: materialInclude });
   if (!material) throw notFound('ไม่พบวัสดุ');
-  return material;
+  return (await withPending([material]))[0]!;
 }
 
 type CreateInput = z.infer<typeof createMaterialSchema>;
@@ -61,7 +72,7 @@ type UpdateInput = z.infer<typeof updateMaterialSchema>;
 
 export async function createMaterial(input: CreateInput) {
   await assertValid(input);
-  return prisma.material.create({ data: input, include: materialInclude });
+  return { ...(await prisma.material.create({ data: input, include: materialInclude })), pendingQuantity: 0 };
 }
 
 /** ADMIN only. The code may change (decision D6); history keeps pointing at the same id. */
@@ -76,7 +87,7 @@ export async function updateMaterial(id: string, input: UpdateInput) {
       ]);
     }
   }
-  return prisma.material.update({ where: { id }, data: input, include: materialInclude });
+  return (await withPending([await prisma.material.update({ where: { id }, data: input, include: materialInclude })]))[0]!;
 }
 
 async function assertValid(input: CreateInput, exceptId?: string): Promise<void> {
