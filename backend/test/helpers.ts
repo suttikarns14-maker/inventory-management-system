@@ -63,3 +63,36 @@ export async function seedBasics() {
 
 export const stockOf = async (id: string) =>
   (await prisma.material.findUniqueOrThrow({ where: { id } })).currentQuantity;
+
+/** A tiny valid PNG data URL, standing in for a drawn signature (D17). */
+export const SIG = 'data:image/png;base64,iVBORw0KGgo=';
+
+type OutItem = { materialId: string; quantity?: number; units?: { unitId: string; remark?: string | null }[] };
+
+/**
+ * D17: a withdrawal is a signed request that someone else approves. Creates the request as
+ * `by`, has admin (staff when `by` is admin) approve all of it, and answers like the old direct
+ * OUT: { status: 201, body: { data: transaction } }, or the first failing response.
+ */
+// Reused per user id (new on every seed): many parallel logins would trip the login rate limit.
+const sessions = new Map<string, ReturnType<typeof loginAs>>();
+async function session(username: string) {
+  const { id } = await prisma.user.findFirstOrThrow({ where: { username } });
+  if (!sessions.has(id)) sessions.set(id, loginAs(username));
+  return sessions.get(id)!;
+}
+
+export async function withdraw(by: string, body: { items: OutItem[] } & Record<string, unknown>) {
+  const items = body.items.map((i) => ({ ...i, quantity: i.units?.length ?? i.quantity }));
+  const created = await (await session(by))
+    .post('/api/v1/inventory/requests')
+    .send({ ...body, signature: SIG, items: items.map(({ materialId, quantity }) => ({ materialId, quantity })) });
+  if (created.status !== 201) return created;
+  const approver = await session(by === 'admin' ? 'staff' : 'admin');
+  const approved = await approver
+    .post(`/api/v1/inventory/requests/${created.body.data.id}/approve`)
+    .send({ signature: SIG, items });
+  if (approved.status !== 200) return approved;
+  const txn = await approver.get(`/api/v1/inventory/transactions/${approved.body.data.transaction.id}`);
+  return { status: 201, body: txn.body };
+}

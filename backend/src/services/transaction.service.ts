@@ -3,6 +3,7 @@ import type { z } from 'zod';
 import type {
   CreateTransactionInput,
   FillDepartmentsInput,
+  WithdrawalHeaderInput,
   historySchema,
   TransactionItemInput,
 } from '../dtos/index.js';
@@ -71,13 +72,15 @@ export function toTransactionDto({ units, ...t }: TransactionRow) {
 // ---- reference numbers ----
 
 /** TXN-YYYYMMDD-NNN from a per-day counter (spec §5.2). The row lock serialises same-day numbering. */
-export async function nextReferenceNo(tx: Tx, date = bangkokDate()): Promise<string> {
+export async function nextReferenceNo(tx: Tx, date = bangkokDate(), prefix: 'TXN' | 'REQ' = 'TXN'): Promise<string> {
   const day = date.replaceAll('-', '');
+  // TXN keeps its original key (YYYYMMDD); requests count separately (D17).
+  const key = prefix === 'TXN' ? day : `${prefix}-${day}`;
   const [row] = await tx.$queryRaw<{ last_value: number }[]>`
-    INSERT INTO reference_counters (date, last_value) VALUES (${day}, 1)
+    INSERT INTO reference_counters (date, last_value) VALUES (${key}, 1)
     ON CONFLICT (date) DO UPDATE SET last_value = reference_counters.last_value + 1
     RETURNING last_value`;
-  return `TXN-${day}-${String(row!.last_value).padStart(3, '0')}`;
+  return `${prefix}-${day}-${String(row!.last_value).padStart(3, '0')}`;
 }
 
 // ---- core movement ----
@@ -262,7 +265,9 @@ export async function assertSerialsFree(tx: Tx, serials: string[]): Promise<void
 // ---- create ----
 
 export async function createTransaction(user: SessionUser, input: CreateTransactionInput) {
-  if (input.type === 'IN' && user.role === 'USER') {
+  // D17: withdrawals go through a signed request and an approval (request.service.ts).
+  if (input.type === 'OUT') throw fieldError('type', 'การเบิกต้องส่งเป็นคำขอเบิกและรออนุมัติ');
+  if (user.role === 'USER') {
     throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์บันทึกรับเข้า');
   }
   const trackingTypes = new Map(
@@ -274,12 +279,11 @@ export async function createTransaction(user: SessionUser, input: CreateTransact
     ).map((m) => [m.id, m.trackingType]),
   );
   const lines = input.items.map((item, i) => toLine(input.type, item, trackingTypes.get(item.materialId), i));
-  const header = input.type === 'IN' ? receiptHeader(user, input) : await withdrawalHeader(user, input);
-  return applyTransaction(user, input.type, header, lines);
+  return applyTransaction(user, input.type, receiptHeader(user, input), lines);
 }
 
 /** Checks the item has the fields its material's tracking type needs (spec v2.2 §3). */
-function toLine(type: TransactionType, item: TransactionItemInput, tracking: TrackingType | undefined, i: number): Line {
+export function toLine(type: TransactionType, item: TransactionItemInput, tracking: TrackingType | undefined, i: number): Line {
   const field = (name: string) => `items.${i}.${name}`;
   if (!tracking) throw notFound('ไม่พบวัสดุบางรายการ');
   if (tracking === 'QUANTITY') {
@@ -316,7 +320,7 @@ function receiptHeader(user: SessionUser, input: CreateTransactionInput): Header
 }
 
 /** Spec v2.2 D10/D11/Q2. */
-async function withdrawalHeader(user: SessionUser, input: CreateTransactionInput): Promise<Header> {
+export async function withdrawalHeader(user: SessionUser, input: WithdrawalHeaderInput): Promise<Header> {
   const errors: FieldError[] = [];
 
   // Requester: USER is always themselves; ADMIN/STAFF pick a user or type a name.

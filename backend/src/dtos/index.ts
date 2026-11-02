@@ -145,6 +145,62 @@ export const createTransactionSchema = z.object({
 });
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
 
+// ---- withdrawal requests (D17) ----
+
+const signature = z
+  .string({ error: 'กรุณาเซ็นชื่อ' })
+  .startsWith('data:image/png;base64,', 'กรุณาเซ็นชื่อ')
+  .max(200_000, 'ลายเซ็นมีขนาดใหญ่เกินไป');
+const uniqueMaterials = (items: { materialId: string }[]) => new Set(items.map((i) => i.materialId)).size === items.length;
+
+/** Header fields a withdrawal needs, shared by requests and the transaction they become. */
+const withdrawalHeaderSchema = createTransactionSchema.pick({
+  note: true,
+  requesterId: true,
+  requesterName: true,
+  requestingDepartmentId: true,
+  usingDepartmentId: true,
+  buildingId: true,
+  floor: true,
+  purpose: true,
+});
+export type WithdrawalHeaderInput = z.infer<typeof withdrawalHeaderSchema>;
+
+export const createRequestSchema = withdrawalHeaderSchema.extend({
+  signature,
+  items: z
+    .array(
+      z.object({
+        materialId: z.string({ error: 'กรุณาเลือกวัสดุ' }).min(1, 'กรุณาเลือกวัสดุ'),
+        quantity: z.number({ error: 'จำนวนต้องเป็นตัวเลข' }).int('จำนวนต้องเป็นจำนวนเต็ม').positive('จำนวนต้องมากกว่า 0'),
+      }),
+    )
+    .min(1, 'ต้องมีรายการวัสดุอย่างน้อย 1 รายการ')
+    .max(100, 'รายการวัสดุต้องไม่เกิน 100 รายการ')
+    .refine(uniqueMaterials, 'มีวัสดุซ้ำในรายการ'),
+});
+export type CreateRequestInput = z.infer<typeof createRequestSchema>;
+
+/** One line per requested material; quantity may be lowered (0 = not given). SERIAL lines list the units. */
+export const approveRequestSchema = z.object({
+  signature,
+  items: z
+    .array(
+      transactionItem.pick({ materialId: true, units: true }).extend({
+        quantity: z.number({ error: 'จำนวนต้องเป็นตัวเลข' }).int('จำนวนต้องเป็นจำนวนเต็ม').min(0, 'จำนวนต้องไม่ติดลบ'),
+      }),
+    )
+    .min(1, 'ต้องมีรายการวัสดุอย่างน้อย 1 รายการ')
+    .refine(uniqueMaterials, 'มีวัสดุซ้ำในรายการ'),
+});
+export type ApproveRequestInput = z.infer<typeof approveRequestSchema>;
+
+export const rejectRequestSchema = z.object({ reason: text('เหตุผลที่ไม่อนุมัติ', 400) });
+
+export const listRequestsSchema = pageQuery.extend({
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']).optional(),
+});
+
 export const reverseTransactionSchema = z.object({ note: text('เหตุผลการยกเลิก', 400) });
 
 export const historySchema = pageQuery.extend({

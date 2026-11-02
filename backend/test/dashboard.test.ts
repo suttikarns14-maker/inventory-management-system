@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/lib/prisma.js';
-import { depts, loginAs, out, seedBasics } from './helpers.js';
+import { depts, loginAs, out, seedBasics, withdraw } from './helpers.js';
 
 let fx: Awaited<ReturnType<typeof seedBasics>>;
 beforeEach(async () => {
@@ -16,11 +16,11 @@ describe('dashboard (spec §6)', () => {
     const unusedMat = await prisma.material.create({
       data: { code: 'OFF-003', name: 'แฟ้ม', unit: 'เล่ม', minStock: 0, categoryId: fx.category.id, currentQuantity: 9 },
     });
-    await staff.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 2));
-    await staff.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 3));
-    await staff.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 1));
+    await withdraw('staff', out(fx.paper.id, 2));
+    await withdraw('staff', out(fx.paper.id, 3));
+    await withdraw('staff', out(fx.pens.id, 1));
     // A mistaken withdrawal of 2 pens, then reversed: it must not count as usage.
-    const mistake = (await staff.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 2))).body.data;
+    const mistake = (await withdraw('staff', out(fx.pens.id, 2))).body.data;
     await admin.post(`/api/v1/inventory/transactions/${mistake.id}/reverse`).send({ note: 'ผิด' });
 
     const byQty = (await staff.get('/api/v1/dashboard/top-withdrawn')).body.data;
@@ -85,7 +85,7 @@ describe('dashboard (spec §6)', () => {
 
   it('suggests reorders, out-of-stock first', async () => {
     const staff = await loginAs('staff');
-    await staff.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 3)); // pens -> 0
+    await withdraw('staff', out(fx.pens.id, 3)); // pens -> 0
     const list = (await staff.get('/api/v1/dashboard/reorder-suggestions')).body.data;
     expect(list[0]).toMatchObject({ code: 'OFF-002', currentQuantity: 0, minStock: 10, daysLeft: 0 });
     // minStock 10 + 3/90 per day * 30 days = 11 after rounding up
@@ -107,7 +107,7 @@ describe('dashboard (spec §6)', () => {
     await receive(['D1'], {}); // no fiscal year: falls in the current one (starts 1 Oct)
     await prisma.stockTransactionItem.updateMany({ where: { transactionId: tor.id }, data: { unitPrice: 100 } });
     const a1 = await prisma.materialUnit.findFirstOrThrow({ where: { serialNumber: 'A1' } });
-    await admin.post('/api/v1/inventory/transactions').send({ type: 'OUT', ...depts, requesterName: 'ก', items: [{ materialId: ram.id, units: [{ unitId: a1.id }] }] });
+    await withdraw('admin', { type: 'OUT', ...depts, requesterName: 'ก', items: [{ materialId: ram.id, units: [{ unitId: a1.id }] }] });
 
     const now = new Date(Date.now() + 7 * 3_600_000); // Bangkok
     const currentFy = now.getUTCFullYear() + 543 + (now.getUTCMonth() >= 9 ? 1 : 0);
@@ -122,10 +122,10 @@ describe('dashboard (spec §6)', () => {
   it('compares monthly withdrawals with the same month last year', async () => {
     const staff = await loginAs('staff');
     const admin = await loginAs('admin');
-    await staff.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 2));
-    const old = (await staff.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 3))).body.data;
+    await withdraw('staff', out(fx.paper.id, 2));
+    const old = (await withdraw('staff', out(fx.paper.id, 3))).body.data;
     await prisma.stockTransaction.update({ where: { id: old.id }, data: { createdAt: new Date(Date.now() - 365 * 86_400_000) } });
-    const mistake = (await staff.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 1))).body.data;
+    const mistake = (await withdraw('staff', out(fx.pens.id, 1))).body.data;
     await admin.post(`/api/v1/inventory/transactions/${mistake.id}/reverse`).send({ note: 'ผิด' });
 
     const months = (await staff.get('/api/v1/dashboard/monthly-withdrawals')).body.data;
@@ -140,11 +140,11 @@ describe('dashboard (spec §6)', () => {
   it('totals withdrawals per using department within a period', async () => {
     const admin = await loginAs('admin');
     await admin.post('/api/v1/inventory/transactions').send({ type: 'IN', items: [{ materialId: fx.paper.id, quantity: 1, unitPrice: 10 }] });
-    await admin.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 2, { requesterName: 'ก' })); // -> sub
-    const old = (await admin.post('/api/v1/inventory/transactions').send(out(fx.paper.id, 3, { requesterName: 'ก' }))).body.data;
+    await withdraw('admin', out(fx.paper.id, 2, { requesterName: 'ก' })); // -> sub
+    const old = (await withdraw('admin', out(fx.paper.id, 3, { requesterName: 'ก' }))).body.data;
     await prisma.stockTransaction.update({ where: { id: old.id }, data: { createdAt: new Date(Date.now() - 100 * 86_400_000) } });
-    await admin.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 1, { requesterName: 'ก', usingDepartmentId: fx.main.id }));
-    const mistake = (await admin.post('/api/v1/inventory/transactions').send(out(fx.pens.id, 2, { requesterName: 'ก' }))).body.data;
+    await withdraw('admin', out(fx.pens.id, 1, { requesterName: 'ก', usingDepartmentId: fx.main.id }));
+    const mistake = (await withdraw('admin', out(fx.pens.id, 2, { requesterName: 'ก' }))).body.data;
     await admin.post(`/api/v1/inventory/transactions/${mistake.id}/reverse`).send({ note: 'ผิด' });
 
     const all = (await admin.get('/api/v1/dashboard/by-department')).body.data;
