@@ -106,6 +106,10 @@ model StockTransaction {
   reversalOfId String?                @unique @map("reversal_of_id")
   reversalOf   StockTransaction?      @relation("Reversal", fields: [reversalOfId], references: [id])
   reversedBy   StockTransaction?      @relation("Reversal")
+  /// D18: an IN that takes back items of this earlier OUT (partial and repeated returns allowed).
+  returnOfId   String?                @map("return_of_id")
+  returnOf     StockTransaction?      @relation("Return", fields: [returnOfId], references: [id])
+  returns      StockTransaction[]     @relation("Return")
   createdAt    DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   items        StockTransactionItem[]
   units        TransactionUnit[]
@@ -132,6 +136,7 @@ model StockTransaction {
 
   @@index([type, createdAt])
   @@index([createdById])
+  @@index([returnOfId])
   @@map("stock_transactions")
 }
 

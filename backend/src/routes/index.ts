@@ -47,6 +47,8 @@ export function apiRouter(): Router {
   r.post('/inventory/transactions', inventory.create);
   r.get('/inventory/transactions/:id', inventory.get);
   r.get('/inventory/transactions/:id/document', inventory.document);
+  r.get('/inventory/transactions/:id/return', staff, inventory.returnable);
+  r.post('/inventory/transactions/:id/return', staff, inventory.returnItems);
   r.post('/inventory/transactions/:id/reverse', admin, inventory.reverse);
   r.patch('/inventory/transactions/:id/departments', admin, inventory.fillDepartments);
   r.get('/inventory/history', inventory.history);

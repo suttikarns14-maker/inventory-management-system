@@ -101,6 +101,13 @@ export const inventory = {
     const { note } = dto.reverseTransactionSchema.parse(req.body);
     ok(res, await transactions.reverseTransaction(currentUser(req), id(req), note), 201);
   },
+  async returnable(req: Request, res: Response) {
+    ok(res, await transactions.returnable(id(req)));
+  },
+  async returnItems(req: Request, res: Response) {
+    const input = dto.returnSchema.parse(req.body);
+    ok(res, await transactions.returnTransaction(currentUser(req), id(req), input), 201);
+  },
   async fillDepartments(req: Request, res: Response) {
     const input = dto.fillDepartmentsSchema.parse(req.body);
     ok(res, await transactions.fillDepartments(currentUser(req), id(req), input));

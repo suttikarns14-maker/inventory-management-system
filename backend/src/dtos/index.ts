@@ -205,6 +205,17 @@ export const listRequestsSchema = pageQuery.extend({
 
 export const reverseTransactionSchema = z.object({ note: text('เหตุผลการยกเลิก', 400) });
 
+/** D18: items handed back against a withdrawal. SERIAL lines list the units; the service checks the count. */
+export const returnSchema = z.object({
+  note: text('เหตุผลการคืน', 400),
+  items: z
+    .array(createRequestSchema.shape.items.element.extend({ units: transactionItem.shape.units }))
+    .min(1, 'ต้องมีรายการวัสดุอย่างน้อย 1 รายการ')
+    .max(100, 'รายการวัสดุต้องไม่เกิน 100 รายการ')
+    .refine(uniqueMaterials, 'มีวัสดุซ้ำในรายการ'),
+});
+export type ReturnInput = z.infer<typeof returnSchema>;
+
 export const historySchema = pageQuery.extend({
   from: dateOnly.optional(),
   to: dateOnly.optional(),
