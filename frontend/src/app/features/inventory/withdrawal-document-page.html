@@ -1,0 +1,96 @@
+<div class="toolbar no-print">
+  <a mat-button routerLink="/inventory/history">
+    <mat-icon>arrow_back</mat-icon>
+    ประวัติรับ-จ่าย
+  </a>
+  @if (isWithdrawal()) {
+    <button mat-flat-button type="button" (click)="print()">
+      <mat-icon>print</mat-icon>
+      พิมพ์ / บันทึก PDF
+    </button>
+  }
+</div>
+
+@if (error(); as e) {
+  <p class="message">{{ e }}</p>
+} @else if (doc(); as d) {
+  @if (!isWithdrawal()) {
+    <p class="message">ใบเบิกมีเฉพาะรายการเบิกจ่าย</p>
+  } @else {
+    @let t = d.transaction;
+    @let r = d.request;
+    <article class="sheet">
+      <h1>ใบเบิกวัสดุ</h1>
+
+      @if (t.reversedBy) {
+        <p class="void">รายการนี้ถูกยกเลิกแล้ว ({{ t.reversedBy.referenceNo }})</p>
+      }
+
+      <dl class="meta">
+        <div><dt>เลขที่รายการ</dt><dd>{{ t.referenceNo }}</dd></div>
+        <div><dt>เลขที่คำขอ</dt><dd>{{ r?.requestNo ?? '-' }}</dd></div>
+        <div><dt>วันที่ขอเบิก</dt><dd>{{ r ? (r.createdAt | date) : '-' }}</dd></div>
+        <div><dt>วันที่จ่าย</dt><dd>{{ t.createdAt | date }}</dd></div>
+        <div><dt>ผู้เบิก</dt><dd>{{ t.requesterName }}</dd></div>
+        <div><dt>หน่วยงานที่เบิก</dt><dd>{{ t.requestingDepartment?.name ?? '-' }}</dd></div>
+        <div><dt>หน่วยงานที่ใช้</dt><dd>{{ t.usingDepartment?.name ?? '-' }}</dd></div>
+        <div><dt>อาคาร / ชั้น</dt><dd>{{ t.building?.name ?? '-' }} / {{ t.floor ?? '-' }}</dd></div>
+        <div class="wide"><dt>ระบบงานที่ใช้</dt><dd>{{ t.purpose ?? '-' }}</dd></div>
+      </dl>
+
+      <table>
+        <thead>
+          <tr>
+            <th class="num">ลำดับ</th>
+            <th>รหัส</th>
+            <th>รายการ</th>
+            <th class="num">จำนวน</th>
+            <th>หน่วย</th>
+            <th>S/N</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of t.items; track item.id; let i = $index) {
+            <tr>
+              <td class="num">{{ i + 1 }}</td>
+              <td>{{ item.material.code }}</td>
+              <td>{{ item.material.name }}</td>
+              <td class="num">{{ item.quantity }}</td>
+              <td>{{ item.material.unit }}</td>
+              <td class="sn">{{ serials(item.units) || '-' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      @if (t.note) {
+        <p><strong>หมายเหตุ:</strong> {{ t.note }}</p>
+      }
+
+      <div class="signatures">
+        <div class="sign">
+          <div class="sign-box">
+            @if (r?.requesterSignature; as src) {
+              <img [src]="src" alt="ลายเซ็นผู้เบิก" />
+            }
+          </div>
+          <div>( {{ t.requesterName }} )</div>
+          <div>ผู้เบิก</div>
+          <div class="muted">วันที่ {{ r ? (r.createdAt | date: 'd MMM y') : '........................' }}</div>
+        </div>
+        <div class="sign">
+          <div class="sign-box">
+            @if (r?.approverSignature; as src) {
+              <img [src]="src" alt="ลายเซ็นผู้อนุมัติ" />
+            }
+          </div>
+          <div>( {{ r?.decidedBy?.fullName ?? '........................................' }} )</div>
+          <div>ผู้อนุมัติ / ผู้จ่าย</div>
+          <div class="muted">วันที่ {{ r?.decidedAt ? (r!.decidedAt | date: 'd MMM y') : '........................' }}</div>
+        </div>
+      </div>
+    </article>
+  }
+} @else {
+  <p class="message">กำลังโหลด...</p>
+}

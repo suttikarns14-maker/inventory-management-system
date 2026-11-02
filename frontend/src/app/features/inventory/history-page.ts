@@ -12,7 +12,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ReasonDialog, ReasonDialogData } from '../../shared/components/reason-dialog';
@@ -42,6 +42,7 @@ import { InventoryService } from './inventory.service';
     MatProgressBarModule,
     MatTooltipModule,
     MatCheckboxModule,
+    RouterLink,
   ],
   templateUrl: './history-page.html',
   styleUrl: './history-page.scss',

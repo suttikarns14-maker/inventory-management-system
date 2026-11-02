@@ -111,9 +111,7 @@
           <th>รายการวัสดุ</th>
           <th>ผู้เบิก / หน่วยงาน</th>
           <th>หมายเหตุ</th>
-          @if (canReverse) {
-            <th></th>
-          }
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -183,8 +181,19 @@
               }
             </td>
             <td class="note">{{ t.note ?? '-' }}</td>
-            @if (canReverse) {
-              <td class="nowrap">
+            <td class="nowrap">
+              @if (t.type === 'OUT' && !t.reversalOf) {
+                <a
+                  mat-icon-button
+                  [routerLink]="['/inventory/transactions', t.id, 'document']"
+                  target="_blank"
+                  matTooltip="ใบเบิก (พิมพ์ / PDF)"
+                  aria-label="ใบเบิก (พิมพ์ / PDF)"
+                >
+                  <mat-icon>print</mat-icon>
+                </a>
+              }
+              @if (canReverse) {
                 @if (missingDepartment(t)) {
                   <button
                     mat-icon-button
@@ -205,12 +214,12 @@
                     <mat-icon>undo</mat-icon>
                   </button>
                 }
-              </td>
-            }
+              }
+            </td>
           </tr>
         } @empty {
           <tr>
-            <td class="empty" [attr.colspan]="canReverse ? 7 : 6">
+            <td class="empty" colspan="7">
               {{ loading() ? 'กำลังโหลด...' : 'ไม่พบรายการตามเงื่อนไขที่เลือก' }}
             </td>
           </tr>

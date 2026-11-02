@@ -18,6 +18,14 @@ export const routes: Routes = [
     loadComponent: () => import('./features/errors/forbidden-page').then((m) => m.ForbiddenPage),
   },
   {
+    // Printable withdrawal form, outside the shell so only the sheet prints (D17).
+    path: 'inventory/transactions/:id/document',
+    title: 'ใบเบิกวัสดุ',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/inventory/withdrawal-document-page').then((m) => m.WithdrawalDocumentPage),
+  },
+  {
     path: '',
     component: Shell,
     canActivate: [authGuard],
