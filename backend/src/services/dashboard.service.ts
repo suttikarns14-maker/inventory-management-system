@@ -35,7 +35,7 @@ const LATEST_PRICE = Prisma.sql`
   SELECT i.unit_price::float8 AS price
   FROM stock_transaction_items i
   JOIN stock_transactions t ON t.id = i.transaction_id
-  WHERE i.material_id = m.id AND t.type = 'IN' AND i.unit_price IS NOT NULL
+  WHERE i.material_id = m.id AND t.type = 'IN' AND i.unit_price IS NOT NULL AND t.return_of_id IS NULL
     AND t.reversal_of_id IS NULL
     AND NOT EXISTS (SELECT 1 FROM stock_transactions r WHERE r.reversal_of_id = t.id)
   ORDER BY t.created_at DESC
@@ -192,7 +192,7 @@ export function procurement() {
     JOIN transaction_units tu ON tu.transaction_id = t.id
     JOIN material_units u ON u.id = tu.unit_id
     JOIN stock_transaction_items i ON i.transaction_id = t.id AND i.material_id = u.material_id
-    WHERE t.type = 'IN' AND t.reversal_of_id IS NULL
+    WHERE t.type = 'IN' AND t.reversal_of_id IS NULL AND t.return_of_id IS NULL -- a return (D18) is not a purchase
       AND NOT EXISTS (SELECT 1 FROM stock_transactions r WHERE r.reversal_of_id = t.id)
     GROUP BY 1, 2
     ORDER BY 1 DESC, 2 NULLS FIRST`;

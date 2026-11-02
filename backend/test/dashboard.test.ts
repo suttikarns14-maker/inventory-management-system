@@ -107,7 +107,7 @@ describe('dashboard (spec §6)', () => {
     await receive(['D1'], {}); // no fiscal year: falls in the current one (starts 1 Oct)
     await prisma.stockTransactionItem.updateMany({ where: { transactionId: tor.id }, data: { unitPrice: 100 } });
     const a1 = await prisma.materialUnit.findFirstOrThrow({ where: { serialNumber: 'A1' } });
-    await withdraw('admin', { type: 'OUT', ...depts, requesterName: 'ก', items: [{ materialId: ram.id, units: [{ unitId: a1.id }] }] });
+    const issued = (await withdraw('admin', { type: 'OUT', ...depts, requesterName: 'ก', items: [{ materialId: ram.id, units: [{ unitId: a1.id }] }] })).body.data;
 
     const now = new Date(Date.now() + 7 * 3_600_000); // Bangkok
     const currentFy = now.getUTCFullYear() + 543 + (now.getUTCMonth() >= 9 ? 1 : 0);
@@ -117,6 +117,13 @@ describe('dashboard (spec §6)', () => {
       { fiscalYear: 2568, projectName: null, receivedQty: 2, receivedValue: 0, unpricedQty: 2, remainingQty: 2, remainingValue: 0 },
       { fiscalYear: 2567, projectName: 'TOR 1', receivedQty: 3, receivedValue: 300, unpricedQty: 0, remainingQty: 2, remainingValue: 200 },
     ]);
+
+    // D18: a return is not a purchase; A1 counts again under its original receipt only.
+    await admin.post(`/api/v1/inventory/transactions/${issued.id}/return`).send({ note: 'คืน', items: [{ materialId: ram.id, quantity: 1, units: [{ unitId: a1.id }] }] });
+    const after = (await admin.get('/api/v1/dashboard/procurement')).body.data;
+    expect(after[0]).toMatchObject({ projectName: null, receivedQty: 1, unpricedQty: 1, remainingQty: 1 });
+    expect(after).toHaveLength(3);
+    expect(after[2]).toMatchObject({ projectName: 'TOR 1', receivedQty: 3, remainingQty: 3, remainingValue: 300 });
   });
 
   it('compares monthly withdrawals with the same month last year', async () => {
