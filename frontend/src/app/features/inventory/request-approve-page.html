@@ -1,0 +1,137 @@
+<div class="page-header">
+  <h1>อนุมัติคำขอเบิก</h1>
+  <a mat-button routerLink="/inventory/requests">
+    <mat-icon>arrow_back</mat-icon>
+    กลับไปรายการคำขอ
+  </a>
+</div>
+
+@if (request(); as r) {
+  <form class="card" [formGroup]="form" (ngSubmit)="approve()">
+    <dl class="summary">
+      <div><dt>เลขที่คำขอ</dt><dd>{{ r.requestNo }}</dd></div>
+      <div><dt>วันที่ขอ</dt><dd>{{ r.createdAt | date }}</dd></div>
+      <div><dt>ผู้เบิก</dt><dd>{{ r.requesterName }}</dd></div>
+      <div><dt>หน่วยงานที่เบิก</dt><dd>{{ r.requestingDepartment.name }}</dd></div>
+      <div><dt>หน่วยงานที่ใช้</dt><dd>{{ r.usingDepartment.name }}</dd></div>
+      @if (r.building || r.floor) {
+        <div><dt>อาคาร / ชั้น</dt><dd>{{ r.building?.name ?? '-' }} / {{ r.floor ?? '-' }}</dd></div>
+      }
+      @if (r.purpose) {
+        <div><dt>ระบบงานที่ใช้</dt><dd>{{ r.purpose }}</dd></div>
+      }
+      @if (r.note) {
+        <div><dt>หมายเหตุ</dt><dd>{{ r.note }}</dd></div>
+      }
+    </dl>
+
+    <div formArrayName="items" class="lines">
+      @for (line of items.controls; track line; let i = $index) {
+        @let item = line.controls.item.value;
+        @let m = item.material;
+        <div class="line" [formGroupName]="i">
+          <div class="line-head">
+            <div>
+              <strong>{{ m.name }}</strong>
+              <span class="muted"> {{ m.code }} · ขอ {{ item.quantity }} {{ m.unit }} · คงเหลือ {{ m.currentQuantity }} {{ m.unit }}</span>
+              @if (m.trackingType === 'SERIAL') {
+                <span class="badge badge-neutral">รายชิ้น (S/N)</span>
+              }
+            </div>
+          </div>
+
+          <div class="line-fields">
+            <mat-form-field class="qty">
+              <mat-label>จำนวนที่อนุมัติ</mat-label>
+              <input matInput type="number" min="0" [max]="item.quantity" step="1" formControlName="quantity" />
+              <span matTextSuffix>{{ m.unit }}</span>
+              @let q = line.controls.quantity;
+              @if (q.hasError('server')) {
+                <mat-error>{{ q.getError('server') }}</mat-error>
+              } @else {
+                <mat-error>0 ถึง {{ item.quantity }} (0 = ไม่ให้เบิกรายการนี้)</mat-error>
+              }
+            </mat-form-field>
+
+            @if (m.trackingType === 'SERIAL' && line.controls.quantity.value > 0) {
+              <mat-form-field class="unit-search">
+                <mat-label>เลือก S/N ({{ line.controls.units.length }}/{{ line.controls.quantity.value }} ชิ้น)</mat-label>
+                <mat-icon matPrefix>qr_code_scanner</mat-icon>
+                <input
+                  matInput
+                  formControlName="unitSearch"
+                  [matAutocomplete]="unitAuto"
+                  (focus)="searchUnits(line)"
+                  (input)="searchUnits(line)"
+                  placeholder="พิมพ์หรือยิงบาร์โค้ด S/N"
+                />
+                <mat-autocomplete #unitAuto="matAutocomplete" [displayWith]="displayUnit" (optionSelected)="pickUnit(line, $event.option.value)">
+                  @for (u of unitOptions(); track u.id) {
+                    <mat-option [value]="u">
+                      <span [class.temp-sn]="u.isTempSerial">{{ u.serialNumber }}</span>
+                      <span class="muted"> {{ u.storageLocation?.name ?? '' }}</span>
+                    </mat-option>
+                  } @empty {
+                    <mat-option disabled>ไม่พบ S/N ที่อยู่ในคลัง</mat-option>
+                  }
+                </mat-autocomplete>
+              </mat-form-field>
+              @if (line.hasError('unitsCount') && line.getError('unitsCount') > 0) {
+                <button mat-stroked-button type="button" (click)="fillTempUnits(line)">
+                  ไม่ระบุ S/N: ใช้ S/N ชั่วคราวอีก {{ line.getError('unitsCount') }} ชิ้น
+                </button>
+              }
+            }
+          </div>
+
+          @if (line.hasError('unitsCount') && (line.controls.units.touched || form.touched)) {
+            <p class="text-danger">
+              @if (line.getError('unitsCount') > 0) {
+                กรุณาเลือก S/N อีก {{ line.getError('unitsCount') }} ชิ้น
+              } @else {
+                เลือก S/N เกินจำนวนที่อนุมัติ {{ -line.getError('unitsCount') }} ชิ้น
+              }
+            </p>
+          }
+          @if (line.controls.units.getError('server'); as e) {
+            <p class="text-danger">{{ e }}</p>
+          }
+
+          @if (line.controls.units.length) {
+            <div formArrayName="units" class="chosen">
+              @for (u of line.controls.units.controls; track u; let j = $index) {
+                <div class="chosen-row" [formGroupName]="j">
+                  <span class="sn" [class.temp-sn]="u.controls.unit.value.isTempSerial">{{ u.controls.unit.value.serialNumber }}</span>
+                  <mat-form-field class="remark">
+                    <mat-label>หมายเหตุ เช่น ติดตั้งกับเครื่อง</mat-label>
+                    <input matInput formControlName="remark" />
+                  </mat-form-field>
+                  <button mat-icon-button type="button" (click)="removeUnit(line, j)" aria-label="เอาออก">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <section class="signature">
+      <h3>ลายเซ็นผู้อนุมัติ</h3>
+      <app-signature-pad formControlName="signature" label="ลายเซ็นผู้อนุมัติ" />
+      @if (form.controls.signature.touched && form.controls.signature.invalid) {
+        <p class="text-danger">{{ form.controls.signature.getError('server') ?? 'กรุณาเซ็นชื่อก่อนอนุมัติ' }}</p>
+      }
+    </section>
+
+    <div class="actions">
+      <span class="muted">อนุมัติแล้วระบบจะตัดสต็อกทันที</span>
+      <button mat-flat-button type="submit" [disabled]="saving()">
+        {{ saving() ? 'กำลังบันทึก...' : 'อนุมัติและจ่ายของ' }}
+      </button>
+    </div>
+  </form>
+} @else {
+  <div class="card loading">กำลังโหลด...</div>
+}

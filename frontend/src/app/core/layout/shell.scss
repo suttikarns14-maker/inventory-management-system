@@ -54,3 +54,14 @@
     padding: 16px;
   }
 }
+
+.nav-badge {
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--mat-sys-error);
+  color: var(--mat-sys-on-error);
+  font-size: 12px;
+  line-height: 22px;
+  text-align: center;
+}

@@ -1,0 +1,112 @@
+<div class="page-header">
+  <h1>คำขอเบิก</h1>
+  <a mat-flat-button routerLink="/inventory/transactions">
+    <mat-icon>add</mat-icon>
+    เบิกวัสดุ
+  </a>
+</div>
+
+<div class="card">
+  <div class="filters">
+    <mat-form-field>
+      <mat-label>สถานะ</mat-label>
+      <mat-select [value]="query().status ?? ''" (selectionChange)="setStatus($event.value || undefined)">
+        <mat-option value="">ทั้งหมด</mat-option>
+        @for (s of statuses; track s) {
+          <mat-option [value]="s">{{ statusLabels[s] }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  <div class="table-wrap">
+    <table class="history">
+      <thead>
+        <tr>
+          <th>วันที่ขอ</th>
+          <th>เลขที่คำขอ</th>
+          <th>รายการวัสดุ</th>
+          <th>ผู้เบิก / หน่วยงาน</th>
+          <th>สถานะ</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of result()?.items ?? []; track r.id) {
+          <tr>
+            <td class="nowrap">{{ r.createdAt | date }}</td>
+            <td class="nowrap">{{ r.requestNo }}</td>
+            <td>
+              <ul class="items">
+                @for (i of r.items; track i.id) {
+                  <li>
+                    {{ i.material.name }} <span class="muted">{{ i.material.code }}</span>
+                    × {{ i.quantity }} {{ i.material.unit }}
+                    @if (i.approvedQuantity !== null && i.approvedQuantity !== i.quantity) {
+                      <span class="badge badge-warn">อนุมัติ {{ i.approvedQuantity }}</span>
+                    }
+                  </li>
+                }
+              </ul>
+              @if (r.note) {
+                <div class="muted">หมายเหตุ: {{ r.note }}</div>
+              }
+            </td>
+            <td>
+              <div>{{ r.requesterName }}</div>
+              <div class="muted">{{ r.requestingDepartment.name }} → {{ r.usingDepartment.name }}</div>
+              @if (r.createdBy.id !== r.requester?.id) {
+                <div class="muted">ส่งโดย {{ r.createdBy.fullName }}</div>
+              }
+            </td>
+            <td>
+              <span [class]="badge[r.status]">{{ statusLabels[r.status] }}</span>
+              @if (r.decidedBy && r.status !== 'CANCELLED') {
+                <div class="muted">โดย {{ r.decidedBy.fullName }} · {{ r.decidedAt | date }}</div>
+              }
+              @if (r.rejectReason) {
+                <div class="text-danger">เหตุผล: {{ r.rejectReason }}</div>
+              }
+              @if (r.transaction) {
+                <div>
+                  <a [routerLink]="['/inventory/transactions', r.transaction.id, 'document']" target="_blank">
+                    {{ r.transaction.referenceNo }} · ใบเบิก
+                  </a>
+                </div>
+              }
+            </td>
+            <td class="nowrap">
+              @if (canDecide(r)) {
+                <a mat-flat-button [routerLink]="[r.id, 'approve']">อนุมัติ</a>
+                <button mat-button type="button" (click)="reject(r)">ไม่อนุมัติ</button>
+              }
+              @if (canCancel(r)) {
+                <button mat-button type="button" (click)="cancel(r)">ยกเลิกคำขอ</button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          @if (!loading()) {
+            <tr>
+              <td colspan="6" class="empty">ไม่มีคำขอเบิก</td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (result(); as page) {
+    <mat-paginator
+      [length]="page.meta.total"
+      [pageIndex]="page.meta.page - 1"
+      [pageSize]="page.meta.limit"
+      [pageSizeOptions]="[20, 50, 100]"
+      (page)="onPage($event)"
+    />
+  }
+</div>

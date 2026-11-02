@@ -21,6 +21,9 @@
         >
           <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
           <span matListItemTitle>{{ item.label }}</span>
+          @if (item.path === '/inventory/requests' && pending()) {
+            <span matListItemMeta class="nav-badge" aria-label="รออนุมัติ">{{ pending() }}</span>
+          }
         </a>
       }
     </mat-nav-list>

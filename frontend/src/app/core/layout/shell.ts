@@ -1,17 +1,18 @@
 import { BreakpointObserver } from '@angular/cdk/layout';
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { map } from 'rxjs';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter, map, startWith, switchMap } from 'rxjs';
 import { Role, ROLE_LABELS } from '../../shared/models/user';
 import { AuthService } from '../auth/auth.service';
 import { MockBackend, USE_MOCK_API } from '../mock/mock-backend';
+import { RequestService } from '../../features/inventory/request.service';
 
 interface NavItem {
   path: string;
@@ -24,6 +25,7 @@ const NAV: NavItem[] = [
   { path: '/dashboard', label: 'ภาพรวมคลัง', icon: 'dashboard', roles: ['ADMIN', 'STAFF'] },
   { path: '/materials', label: 'รายการวัสดุ', icon: 'inventory_2' },
   { path: '/inventory/transactions', label: 'รับเข้า / เบิกจ่าย', icon: 'swap_horiz' },
+  { path: '/inventory/requests', label: 'คำขอเบิก', icon: 'approval' },
   { path: '/inventory/history', label: 'ประวัติรับ-จ่าย', icon: 'history' },
   { path: '/units', label: 'ค้นหา S/N', icon: 'qr_code_2', roles: ['ADMIN', 'STAFF'] },
   { path: '/settings/categories', label: 'หมวดหมู่วัสดุ', icon: 'category', roles: ['ADMIN'] },
@@ -57,6 +59,22 @@ export class Shell {
 
   protected readonly useMock = USE_MOCK_API;
   protected readonly user = this.auth.user;
+  /** STAFF/ADMIN: requests waiting for approval (D17), refreshed on every navigation. */
+  protected readonly pending = signal(0);
+
+  constructor() {
+    if (!this.auth.hasRole('ADMIN', 'STAFF')) return;
+    const requests = inject(RequestService);
+    this.router.events
+      .pipe(
+        filter((e) => e instanceof NavigationEnd),
+        startWith(null),
+        switchMap(() => requests.pendingCount()),
+        takeUntilDestroyed(),
+      )
+      .subscribe({ next: (n) => this.pending.set(n), error: () => this.pending.set(0) });
+  }
+
   protected readonly roleLabel = computed(() => {
     const role = this.auth.role();
     return role ? ROLE_LABELS[role] : '';

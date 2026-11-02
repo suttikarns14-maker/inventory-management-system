@@ -69,6 +69,19 @@ export const routes: Routes = [
           import('./features/inventory/transaction-form-page').then((m) => m.TransactionFormPage),
       },
       {
+        path: 'inventory/requests',
+        title: 'คำขอเบิก',
+        loadComponent: () =>
+          import('./features/inventory/request-list-page').then((m) => m.RequestListPage),
+      },
+      {
+        path: 'inventory/requests/:id/approve',
+        title: 'อนุมัติคำขอเบิก',
+        data: { roles: ['ADMIN', 'STAFF'] },
+        loadComponent: () =>
+          import('./features/inventory/request-approve-page').then((m) => m.RequestApprovePage),
+      },
+      {
         path: 'inventory/history',
         title: 'ประวัติรับ-จ่าย',
         loadComponent: () =>
