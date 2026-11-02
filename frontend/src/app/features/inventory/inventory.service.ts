@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { ApiSuccess } from '../../shared/models/api';
-import { CreateTransactionInput, HistoryQuery, StockTransaction } from '../../shared/models/transaction';
+import { CreateTransactionInput, HistoryQuery, Returnable, ReturnInput, StockTransaction } from '../../shared/models/transaction';
 import { UserOption } from '../../shared/models/user';
 import { API, toParams, unwrap, unwrapPage } from '../../shared/utils/http';
 
@@ -23,6 +23,17 @@ export class InventoryService {
   reverse(id: string, note: string) {
     return this.http
       .post<ApiSuccess<StockTransaction>>(`${API}/inventory/transactions/${id}/reverse`, { note })
+      .pipe(unwrap());
+  }
+
+  /** STAFF/ADMIN (D18): what can still come back from a withdrawal. */
+  returnable(id: string) {
+    return this.http.get<ApiSuccess<Returnable>>(`${API}/inventory/transactions/${id}/return`).pipe(unwrap());
+  }
+
+  returnItems(id: string, input: ReturnInput) {
+    return this.http
+      .post<ApiSuccess<StockTransaction>>(`${API}/inventory/transactions/${id}/return`, input)
       .pipe(unwrap());
   }
 

@@ -63,6 +63,15 @@
         </tbody>
       </table>
 
+      @for (r of t.returns; track r.id) {
+        <p>
+          <strong>รับคืนแล้ว {{ r.referenceNo }}:</strong>
+          @for (ri of r.items; track ri.materialId; let last = $last) {
+            {{ materialName(ri.materialId) }} {{ ri.quantity }}{{ last ? '' : ',' }}
+          }
+        </p>
+      }
+
       @if (t.note) {
         <p><strong>หมายเหตุ:</strong> {{ t.note }}</p>
       }

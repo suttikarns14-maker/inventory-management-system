@@ -40,6 +40,10 @@ export class WithdrawalDocumentPage implements OnInit {
     return units.map((u) => u.serialNumber).join(', ');
   }
 
+  protected materialName(id: string): string {
+    return this.doc()?.transaction.items.find((i) => i.materialId === id)?.material.name ?? '';
+  }
+
   protected print(): void {
     window.print();
   }

@@ -126,10 +126,16 @@
               @if (t.reversalOf) {
                 <div><span class="badge badge-warn">รายการยกเลิกของ {{ t.reversalOf.referenceNo }}</span></div>
               }
+              @if (t.returnOf) {
+                <div><span class="badge badge-neutral">รับคืนจาก {{ t.returnOf.referenceNo }}</span></div>
+              }
+              @for (r of t.returns; track r.id) {
+                <div><span class="badge badge-neutral">รับคืนแล้ว {{ r.referenceNo }}</span></div>
+              }
             </td>
             <td>
               <span class="badge" [class]="t.type === 'IN' ? 'badge badge-ok' : 'badge badge-danger'">
-                {{ typeLabels[t.type] }}
+                {{ t.returnOf ? 'รับคืน' : typeLabels[t.type] }}
               </span>
             </td>
             <td>
@@ -156,7 +162,7 @@
               </ul>
             </td>
             <td>
-              @if (t.type === 'OUT' && !t.reversalOf) {
+              @if ((t.type === 'OUT' && !t.reversalOf) || t.returnOf) {
                 {{ t.requesterName }}
                 <div class="muted">
                   {{ t.requestingDepartment?.name ?? '' }}
@@ -176,7 +182,7 @@
                   <div class="muted">ปีงบ {{ t.fiscalYear ?? '-' }} {{ t.projectName ? '· ' + t.projectName : '' }}</div>
                 }
               }
-              @if (t.createdBy.fullName !== t.requesterName && t.type === 'OUT') {
+              @if (t.createdBy.fullName !== t.requesterName && (t.type === 'OUT' || t.returnOf)) {
                 <div class="muted">บันทึกโดย {{ t.createdBy.fullName }}</div>
               }
             </td>
@@ -192,6 +198,11 @@
                 >
                   <mat-icon>print</mat-icon>
                 </a>
+                @if (canReturn && !t.reversedBy) {
+                  <button mat-icon-button (click)="takeBack(t)" matTooltip="รับคืน" aria-label="รับคืน">
+                    <mat-icon>assignment_return</mat-icon>
+                  </button>
+                }
               }
               @if (canReverse) {
                 @if (missingDepartment(t)) {

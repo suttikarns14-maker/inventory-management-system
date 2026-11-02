@@ -27,6 +27,7 @@ import { Notify } from '../../shared/services/notify';
 import { MaterialService } from '../materials/material.service';
 import { FillDepartmentsData, FillDepartmentsDialog } from './fill-departments-dialog';
 import { InventoryService } from './inventory.service';
+import { ReturnDialog } from './return-dialog';
 
 @Component({
   selector: 'app-history-page',
@@ -56,6 +57,7 @@ export class HistoryPage {
 
   protected readonly isUser = this.auth.hasRole('USER');
   protected readonly canReverse = this.auth.hasRole('ADMIN');
+  protected readonly canReturn = this.auth.hasRole('ADMIN', 'STAFF');
   protected readonly typeLabels = TRANSACTION_TYPE_LABELS;
   protected readonly materials = toSignal(
     inject(MaterialService)
@@ -131,6 +133,17 @@ export class HistoryPage {
       .subscribe((updated) => {
         if (!updated) return;
         this.notify.success(`บันทึกหน่วยงานของ ${updated.referenceNo} แล้ว`);
+        this.load();
+      });
+  }
+
+  protected takeBack(txn: StockTransaction): void {
+    this.dialog
+      .open<ReturnDialog, StockTransaction, StockTransaction>(ReturnDialog, { data: txn, width: '560px' })
+      .afterClosed()
+      .subscribe((ret) => {
+        if (!ret) return;
+        this.notify.success(`บันทึกรับคืนแล้ว (${ret.referenceNo})`);
         this.load();
       });
   }
